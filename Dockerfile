@@ -10,7 +10,7 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 WORKDIR /var/www
 
 # 先複製 composer 檔案利用 cache
-COPY composer.json composer.lock ./
+COPY app/composer.json app/composer.lock ./
 
 # 用 ARG 讓 CI/Production 可切換 dev 套件
 ARG APP_ENV=local
@@ -22,7 +22,7 @@ RUN if [ "$APP_ENV" = "production" ]; then \
     fi
 
 # 再複製完整程式碼
-COPY . .
+COPY app/. .
 
 RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
 
