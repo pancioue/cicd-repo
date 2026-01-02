@@ -1,17 +1,20 @@
-name: CI Demo
+name: CI - PR
 
 on:
-  push:
-    branches: [ "main" ]
   pull_request:
+    branches: [ "main" ]
 
 jobs:
-  demo:
+  test:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Show repo files
-        run: ls -al
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          tools: composer:v2
+
+      - name: Install dependencies
+        working-directory: app
+        run: composer install --no-interaction --prefer-dist --no-progress

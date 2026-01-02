@@ -16,7 +16,7 @@ services:
     ports:
       - "8080:80"
     volumes:
-      - .:/var/www
+      - ./app:/var/www
       - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
     depends_on:
       - app
