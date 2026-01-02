@@ -1,0 +1,21 @@
+# VCS
+.git
+.gitignore
+
+# Dependencies (let Docker install them)
+node_modules
+vendor
+
+# Env / secrets
+.env
+
+# Runtime generated
+storage/logs
+storage/framework/cache
+storage/framework/sessions
+storage/framework/views
+
+# Tests / local files
+npm-debug.log
+yarn-error.log
+.DS_Store

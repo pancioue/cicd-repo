@@ -1,0 +1,19 @@
+name: CI - Main
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            --build-arg APP_ENV=production \
+            -t app:${{ github.sha }} \
+            -f Dockerfile \
+            .
