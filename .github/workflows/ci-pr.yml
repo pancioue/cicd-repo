@@ -31,7 +31,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./test/Dockerfile
+          file: ./Dockerfile
           push: false
           build-args: |
             APP_ENV=production
