@@ -18,3 +18,20 @@ jobs:
       - name: Install dependencies
         working-directory: app
         run: composer install --no-interaction --prefer-dist --no-progress
+  
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build only (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./test/Dockerfile
+          push: false
+          build-args: |
+            APP_ENV=production
