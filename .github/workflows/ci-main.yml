@@ -35,7 +35,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./test/Dockerfile # Using test Dockerfile for main branch
+          file: ./test/Dockerfile # Using test Dockerfile for main branch one more
           push: true
           build-args: |
             APP_ENV=production
