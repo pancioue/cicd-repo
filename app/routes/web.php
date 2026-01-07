@@ -9,4 +9,8 @@ Route::get('/', function () {
 Route::get('/about', function () {
     return 'about';
 });
-//
+
+
+Route::get('/healthz', function () {
+    return response('ok', 200);
+});
