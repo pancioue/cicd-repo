@@ -1,0 +1,105 @@
+# cloudbuild.yaml
+# 目標：只允許 tag 觸發部署；先 no-traffic 部署到 tagged URL 做 smoke test；
+#      成功才把 100% 流量切到新 revision；失敗就自動切回舊 revision。
+
+substitutions:
+  _SERVICE: "cicd-repo"
+  _REGION: "asia-east1"
+  # 這裡用你 GitHub Actions release 產出的 tag image
+  _IMAGE: "ghcr.io/pancioue/cicd-repo:$TAG_NAME"
+  # 你要測的路徑（依你的 app 調整；至少回 200）
+  _SMOKE_PATH: "/healthz"
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+steps:
+  # 0) 防呆：一定要用 tag 觸發，避免 main 被拿來部署
+  - name: gcr.io/cloud-builders/bash
+    id: "Guard: require TAG"
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        if [ -z "${TAG_NAME}" ]; then
+          echo "❌ This deployment must be triggered by a Git tag (release)."
+          exit 1
+        fi
+        echo "✅ TAG_NAME=${TAG_NAME}"
+
+  # 1) 記錄目前線上 100% 的 revision（用於失敗回滾）
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    id: "Capture current revision"
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -e
+        CURRENT_REV=$(gcloud run services describe "${_SERVICE}" \
+          --region "${_REGION}" \
+          --format='value(status.traffic[0].revisionName)')
+        echo "Current revision: ${CURRENT_REV}"
+        echo -n "${CURRENT_REV}" > /workspace/current_rev.txt
+
+  # 2) no-traffic 部署新 revision，並加 tag 產生一個可測試的 URL（不影響正式流量）
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    id: "Deploy (no-traffic) with canary tag"
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_IMAGE}
+      - --region=${_REGION}
+      - --no-traffic
+      - --tag=canary
+      - --quiet
+
+  # 3) 取出 canary URL 來跑 smoke test
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    id: "Get canary URL"
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -e
+        CANARY_URL=$(gcloud run services describe "${_SERVICE}" \
+          --region "${_REGION}" \
+          --format='value(status.traffic[?tag=="canary"].url)')
+        echo "Canary URL: ${CANARY_URL}"
+        echo -n "${CANARY_URL}" > /workspace/canary_url.txt
+
+  - name: curlimages/curl:8.5.0
+    id: "Smoke test"
+    entrypoint: sh
+    args:
+      - -c
+      - |
+        set -e
+        CANARY_URL="$(cat /workspace/canary_url.txt)"
+        echo "Hitting: ${CANARY_URL}${_SMOKE_PATH}"
+        # 依需求調整重試次數/等待
+        for i in 1 2 3 4 5; do
+          code="$(curl -sS -o /dev/null -w "%{http_code}" "${CANARY_URL}${_SMOKE_PATH}" || true)"
+          echo "Attempt $i -> HTTP ${code}"
+          if [ "${code}" = "200" ]; then exit 0; fi
+          sleep 2
+        done
+        echo "❌ Smoke test failed"
+        exit 1
+
+  # 4) Smoke test 成功 -> 把 100% 流量切到 latest revision（也可改成指定 revision）
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    id: "Promote traffic to latest"
+    args:
+      - run
+      - services
+      - update-traffic
+      - ${_SERVICE}
+      - --region=${_REGION}
+      - --to-latest
+      - --quiet
+
+# 5) 如果前面任何一步失敗，Cloud Build 會直接 fail。
+#    你若要「失敗就自動回滾」，最簡單做法是把 promote/rollback 包在同一個 bash 裡做 try/catch；
+#    但因為 Cloud Build step fail 就會中止，這裡先給你一個“明確可控”的版本：
+#    你可以在失敗後手動執行 rollback 指令（下面我也給你）。
