@@ -1,5 +1,5 @@
-# Dockerfile
-FROM php:8.4-fpm
+# Dockerfile (Cloud Run-friendly)
+FROM php:8.4-cli
 
 RUN apt-get update && apt-get install -y \
     git unzip libzip-dev \
@@ -12,7 +12,6 @@ WORKDIR /var/www
 # 先複製 composer 檔案利用 cache
 COPY app/composer.json app/composer.lock ./
 
-# 用 ARG 讓 CI/Production 可切換 dev 套件
 ARG APP_ENV=local
 
 RUN if [ "$APP_ENV" = "production" ]; then \
@@ -26,4 +25,8 @@ COPY app/. .
 
 RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
 
-CMD ["php-fpm", "-F"]
+# Cloud Run 會注入 PORT 環境變數（通常 8080）
+ENV PORT=8080
+
+# 重要：一定要綁 0.0.0.0，而且 port 用 $PORT
+CMD ["sh", "-c", "php -S 0.0.0.0:${PORT} -t public"]
