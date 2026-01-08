@@ -33,6 +33,7 @@ steps:
   # 2) no-traffic 部署新 revision，並加 canary tag 產生測試 URL
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
     id: "Deploy (no-traffic) with canary tag"
+    entrypoint: gcloud
     args:
       - run
       - deploy
@@ -79,6 +80,7 @@ steps:
   # 5) 成功才切 100% 流量到 latest revision
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
     id: "Promote traffic to latest"
+    entrypoint: gcloud
     args:
       - run
       - services
