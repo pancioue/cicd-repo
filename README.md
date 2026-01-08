@@ -296,7 +296,12 @@ gcloud run services update-traffic YOUR_SERVICE \
 * 注意設定一定要選擇 Cloud Build 設定欓
   👉 完整執行你定義的 pipeline
 
-![manul_dploy](/image/manul_deploy/manul_deploy_config.jpg)
+![manul_deploy](/image/manul_deploy/manul_deploy_config.jpg)
+
+新增了 cloudbuild.yaml 後就可以手動部署看看
+![manul_deploy](/image/manul_deploy/manul_deploy_choose_branch.jpg)
+
+
 
 
 

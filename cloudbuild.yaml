@@ -1,6 +1,8 @@
 # cloudbuild.yaml
 # 目標：只允許 tag 觸發部署；先 no-traffic 部署到 tagged URL 做 smoke test；
 #      成功才把 100% 流量切到新 revision；失敗就自動切回舊 revision。
+#
+# 注意：Cloud Build 會先做 substitutions 展開，Bash 變數要用 $$ 逃逸，避免被當成內建 substitution。
 
 substitutions:
   _SERVICE: "cicd-repo"
@@ -35,11 +37,11 @@ steps:
       - -c
       - |
         set -e
-        CURRENT_REV=$(gcloud run services describe "${_SERVICE}" \
+        CURRENT_REV=$$(gcloud run services describe "${_SERVICE}" \
           --region "${_REGION}" \
           --format='value(status.traffic[0].revisionName)')
-        echo "Current revision: ${CURRENT_REV}"
-        echo -n "${CURRENT_REV}" > /workspace/current_rev.txt
+        echo "Current revision: $${CURRENT_REV}"
+        echo -n "$${CURRENT_REV}" > /workspace/current_rev.txt
 
   # 2) no-traffic 部署新 revision，並加 tag 產生一個可測試的 URL（不影響正式流量）
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
@@ -62,11 +64,11 @@ steps:
       - -c
       - |
         set -e
-        CANARY_URL=$(gcloud run services describe "${_SERVICE}" \
+        CANARY_URL=$$(gcloud run services describe "${_SERVICE}" \
           --region "${_REGION}" \
           --format='value(status.traffic[?tag=="canary"].url)')
-        echo "Canary URL: ${CANARY_URL}"
-        echo -n "${CANARY_URL}" > /workspace/canary_url.txt
+        echo "Canary URL: $${CANARY_URL}"
+        echo -n "$${CANARY_URL}" > /workspace/canary_url.txt
 
   - name: curlimages/curl:8.5.0
     id: "Smoke test"
@@ -75,13 +77,13 @@ steps:
       - -c
       - |
         set -e
-        CANARY_URL="$(cat /workspace/canary_url.txt)"
-        echo "Hitting: ${CANARY_URL}${_SMOKE_PATH}"
+        CANARY_URL="$$(cat /workspace/canary_url.txt)"
+        echo "Hitting: $${CANARY_URL}${_SMOKE_PATH}"
         # 依需求調整重試次數/等待
         for i in 1 2 3 4 5; do
-          code="$(curl -sS -o /dev/null -w "%{http_code}" "${CANARY_URL}${_SMOKE_PATH}" || true)"
-          echo "Attempt $i -> HTTP ${code}"
-          if [ "${code}" = "200" ]; then exit 0; fi
+          code="$$(curl -sS -o /dev/null -w "%{http_code}" "$${CANARY_URL}${_SMOKE_PATH}" || true)"
+          echo "Attempt $$i -> HTTP $${code}"
+          if [ "$${code}" = "200" ]; then exit 0; fi
           sleep 2
         done
         echo "❌ Smoke test failed"
