@@ -315,7 +315,10 @@ gcloud run services update-traffic YOUR_SERVICE \
 
 
 ## 2) 加一個最基本的 Test Job（CI 才完整）
-## 3) 把 Docker build 變快（Build Cache）
+
+## 把 Docker build 變快（Build Cache）
+
+### 如果你想再快一點（進階）：用 BuildKit cache mount 讓 composer 下載快取留住（同一 runner/同一 cache 會更有感）。
 
 ## 版本會爆炸怎麼辦?
 相對不重要，先記錄保留問題

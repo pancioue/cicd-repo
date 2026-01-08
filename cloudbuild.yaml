@@ -17,7 +17,7 @@ options:
 
 steps:
   # 0) 防呆：一定要用 tag 觸發，避免 main 被拿來部署
-  - name: gcr.io/cloud-builders/bash
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
     id: "Guard: require TAG"
     entrypoint: bash
     args:
