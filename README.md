@@ -305,8 +305,11 @@ UI手動建立似乎沒有法加入tag選項，預設似乎是抓 最後一版�
 (不過使用 CLI 應該可以指定 tag，沒試過)
 
 在 _cloudbuild.yaml_ 可以指定 Image 版本，不過如果每次都要手動改 code 似乎不太好，原則上應該是用 latest
-
-
+為了讓 Cloud Build 可以讀取 GHCR.io 必須先設定 Artifact Registry
+![artifact registry](/image/manul_deploy/artifact_registry.jpg)
+上面大概是必須要填的欄位，其中驗證模式比較麻煩，
+密鑰需要新增，這裡填上面的 GHCR 時得到的 key
+![GHCR key](/image/manul_deploy/ghcr_key.jpg)
 
 
 
