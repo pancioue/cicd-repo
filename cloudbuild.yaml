@@ -1,16 +1,12 @@
-# cloudbuild.yaml (UI manual run friendly, no canary URL dependency)
-# 目標：UI 手動 Run（預設 main）也能部署，不依賴 TAG_NAME / 不依賴 canary URL
-# 流程：no-traffic deploy（canary tag）→ 透過 gcloud run services proxy 在本機驗證 /healthz → promote traffic
-#
-# 注意：
-# 1) Cloud Build 會先做 substitutions 展開，Bash 變數要用 $$ 逃逸，避免被當成內建 substitution。
-# 2) 這份 smoke test 不需要公開 URL、也不受 Ingress/Allow unauthenticated 影響（因為走 proxy）。
+# cloudbuild.yaml (UI manual run friendly)
+# 目標：UI 手動 Run（預設 main）也能部署，不依賴 TAG_NAME
+# 流程：no-traffic deploy（canary tag）→ smoke test(/healthz) → promote traffic to latest
 
 substitutions:
   _SERVICE: "cicd-repo"
   _REGION: "asia-east1"
 
-  # 使用 Artifact Registry Remote Repo 代理 GHCR 的 image
+  # ✅ 不用 TAG_NAME：直接部署 latest（你 GitHub Actions main build 會推這個）
   _IMAGE: "asia-east1-docker.pkg.dev/cicd-learning-483517/cicd-learngin-registry/pancioue/cicd-repo:latest"
 
   # smoke test path
@@ -30,11 +26,11 @@ steps:
         set -e
         CURRENT_REV=$$(gcloud run services describe "${_SERVICE}" \
           --region "${_REGION}" \
-          --format='value(status.traffic[?percent==100].revisionName)')
-        echo "Current 100% revision: $${CURRENT_REV}"
+          --format='value(status.traffic[0].revisionName)')
+        echo "Current revision: $${CURRENT_REV}"
         echo -n "$${CURRENT_REV}" > /workspace/current_rev.txt
 
-  # 1) no-traffic 部署新 revision，並加 canary tag（用於標示/管理；不依賴其 URL）
+  # 1) no-traffic 部署新 revision，並加 canary tag 產生測試 URL
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
     id: "Deploy (no-traffic) with canary tag"
     entrypoint: gcloud
@@ -48,45 +44,32 @@ steps:
       - --tag=canary
       - --quiet
 
-  # 2) 啟動 Cloud Run proxy，讓同一個 build 環境可用 localhost 呼叫服務
+  # 2) 取得 canary URL
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
-    id: "Start Cloud Run proxy"
+    id: "Get canary URL"
     entrypoint: bash
     args:
       - -c
       - |
         set -e
-
-        # 背景啟動 proxy（轉發到 Cloud Run service）
-        gcloud run services proxy "${_SERVICE}" \
+        CANARY_URL=$$(gcloud run services describe "${_SERVICE}" \
           --region "${_REGION}" \
-          --port 8080 \
-          --quiet &
+          --format='value(status.traffic[?tag=="canary"].url)')
+        echo "Canary URL: $${CANARY_URL}"
+        echo -n "$${CANARY_URL}" > /workspace/canary_url.txt
 
-        # 等 proxy ready（最多約 30 秒）
-        for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
-          if curl -sS -o /dev/null "http://127.0.0.1:8080/" ; then
-            echo "✅ Proxy is ready"
-            exit 0
-          fi
-          echo "Waiting for proxy... ($$i)"
-          sleep 2
-        done
-
-        echo "❌ Proxy did not become ready"
-        exit 1
-
-  # 3) Smoke test（透過 proxy 打 localhost）
+  # 3) Smoke test
   - name: curlimages/curl:8.5.0
-    id: "Smoke test (via proxy)"
+    id: "Smoke test"
     entrypoint: sh
     args:
       - -c
       - |
         set -e
-        echo "Hitting: http://127.0.0.1:8080${_SMOKE_PATH}"
+        CANARY_URL="$$(cat /workspace/canary_url.txt)"
+        echo "Hitting: $${CANARY_URL}${_SMOKE_PATH}"
         for i in 1 2 3 4 5; do
-          code="$$(curl -sS -o /dev/null -w "%{http_code}" "http://127.0.0.1:8080${_SMOKE_PATH}" || true)"
+          code="$$(curl -sS -o /dev/null -w "%{http_code}" "$${CANARY_URL}${_SMOKE_PATH}" || true)"
           echo "Attempt $$i -> HTTP $${code}"
           if [ "$${code}" = "200" ]; then exit 0; fi
           sleep 2
