@@ -35,3 +35,6 @@ jobs:
           push: false
           build-args: |
             APP_ENV=production
+          cache-from: type=gha # 快取加速用
+          cache-to: type=gha,mode=max # 快取加速用
+
