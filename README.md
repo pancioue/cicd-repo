@@ -27,7 +27,21 @@ your-repo/
     nginx/default.conf
   Dockerfile
   docker-compose.yml
-  .github/workflows/ci-cd.yml
+  .github/workflows/
+    ci-pr.yml
+    ci-main.yml
+    ci-release.yml
+```
+
+### ci-release.yml 
+```
+name: CI - Release (Build & Push Version + SHA)
+
+on:
+  release: # 當發佈一版時會執行
+    types: [published]
+
+...
 ```
 
 開始一個基本的 laravel 專案
