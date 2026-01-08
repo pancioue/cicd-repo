@@ -55,7 +55,7 @@ steps:
         CANARY_URL=$$(gcloud run services describe "${_SERVICE}" \
           --region "${_REGION}" \
           --format='value(status.traffic[?tag=="canary"].url)')
-        echo "Canary URL: $${CANARY_URL}"
+        echo "Canary URL: ${CANARY_URL}"
         echo -n "$${CANARY_URL}" > /workspace/canary_url.txt
 
   # 3) Smoke test
