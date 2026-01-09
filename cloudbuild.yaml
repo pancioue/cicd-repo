@@ -10,7 +10,7 @@ substitutions:
   _IMAGE: "asia-east1-docker.pkg.dev/cicd-learning-483517/cicd-learngin-registry/pancioue/cicd-repo:latest"
 
   # smoke test path
-  _SMOKE_PATH: "/healthz"
+  _SMOKE_PATH: "/up"
 
 options:
   logging: CLOUD_LOGGING_ONLY
