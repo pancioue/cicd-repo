@@ -18,6 +18,58 @@ Docker 的價值不是「比較潮」，而是：
 沒有 Docker → 部署是一連串命令
 有 Docker → 部署是一個版本切換
 
+
+有無 docker 差異
+-------
+
+1️⃣ 部署一致性（Deployment Consistency）
+沒有 Docker 時，CD 通常在機器上做：
+``` bash
+git pull
+composer install
+npm install
+npm run build
+php artisan migrate
+```
+
+✅ 有 Docker 為什麼一致？
+
+CI 階段 build image
+image 是 immutable artifact
+CD 只做：
+``` bash
+docker pull myapp:sha
+docker run myapp:sha
+```
+
+2️⃣ CI/CD 解耦（Decoupling）
+3️⃣ 回滾（Rollback）
+❌ 沒 Docker 為什麼痛苦？
+
+Rollback 你要：
+ * git checkout 上一版
+ * 還原 vendor
+ * 還原 build assets
+ * 重新跑部署流程
+
+👉 你在「回到某個狀態」，但那個狀態已經不在了
+
+✅ Docker 回滾為什麼秒殺？
+因為你已經有：
+``` bash
+myapp:abc123
+myapp:def456
+```
+Rollback =：
+```bash
+docker run myapp:abc123
+```
+👉 不重 build
+👉 不重裝依賴
+👉 不碰主機環境
+
+這是「切版本」，不是「修環境」
+
 ## 初始環境
 專案結構
 ```bash
@@ -304,20 +356,30 @@ gcloud run services update-traffic YOUR_SERVICE \
 UI手動建立似乎沒有法加入tag選項，預設是抓 latest 版號
 (不過使用 CLI 應該可以指定 tag，沒試過)
 
-在 _cloudbuild.yaml_ 可以指定 Image 版本，不過如果每次都要手動改 code 似乎不太好，原則上應該是用 latest
 為了讓 Cloud Build 可以讀取 GHCR.io 必須先設定 Artifact Registry
 ![artifact registry](/image/manul_deploy/artifact_registry.jpg)
 上面大概是必須要填的欄位，其中驗證模式比較麻煩，
 密鑰需要新增，這裡填上面的 GHCR 時得到的 key
 ![GHCR key](/image/manul_deploy/ghcr_key.jpg)
 
+### cloudbuild.yaml
+* 可以指定 Image 版本，不過如果每次都要手動改版號似有些麻煩，原則上應該是用 latest
+* 這份 `cloudbuild.yaml` 包含了 
+  `Canary deployment + Smoke test`
+  這裡算是卡關滿久的，cloudbuild.yaml 是很容易卡關的地方
 
+#### Canary deployment
+Canary deployment 是一種部署策略，
+先讓「新版本」只接觸極少量或隔離的流量，
+確認穩定後，再逐步或一次性切換成正式版本。
 
+#### Smoke Test
+定義是：
+* 快速
+* 輕量
+* 驗證「服務有沒有起來、基本功能是否可用」
+* 通常是 /healthz, /up, /ping
 
-
-
-## 正式測試
-基本上到前面這可以說已經算是完整了
 
 
 
@@ -325,61 +387,7 @@ UI手動建立似乎沒有法加入tag選項，預設是抓 latest 版號
 
 ## 2) 加一個最基本的 Test Job（CI 才完整）
 
-## 把 Docker build 變快（Build Cache）
-
 ### 如果你想再快一點（進階）：用 BuildKit cache mount 讓 composer 下載快取留住（同一 runner/同一 cache 會更有感）。
 
 ## 版本會爆炸怎麼辦?
 相對不重要，先記錄保留問題
-
-
-有無 docker 差異
--------
-
-1️⃣ 部署一致性（Deployment Consistency）
-沒有 Docker 時，CD 通常在機器上做：
-``` bash
-git pull
-composer install
-npm install
-npm run build
-php artisan migrate
-```
-
-✅ 有 Docker 為什麼一致？
-
-CI 階段 build image
-image 是 immutable artifact
-CD 只做：
-``` bash
-docker pull myapp:sha
-docker run myapp:sha
-```
-
-2️⃣ CI/CD 解耦（Decoupling）
-3️⃣ 回滾（Rollback）
-❌ 沒 Docker 為什麼痛苦？
-
-Rollback 你要：
- * git checkout 上一版
- * 還原 vendor
- * 還原 build assets
- * 重新跑部署流程
-
-👉 你在「回到某個狀態」，但那個狀態已經不在了
-
-✅ Docker 回滾為什麼秒殺？
-因為你已經有：
-``` bash
-myapp:abc123
-myapp:def456
-```
-Rollback =：
-```bash
-docker run myapp:abc123
-```
-👉 不重 build
-👉 不重裝依賴
-👉 不碰主機環境
-
-這是「切版本」，不是「修環境」

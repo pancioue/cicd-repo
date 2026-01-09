@@ -20,6 +20,9 @@ RUN if [ "$APP_ENV" = "production" ]; then \
       composer install --no-interaction --prefer-dist --no-scripts --no-progress; \
     fi
 
+# 🔍 Debug：確認 routes（暫時用）
+RUN php artisan route:list
+
 # 再複製完整程式碼
 COPY app/. .
 
