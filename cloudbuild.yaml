@@ -1,6 +1,7 @@
 # cloudbuild.yaml (UI manual run friendly)
 # 目標：UI 手動 Run（預設 main）也能部署，不依賴 TAG_NAME
 # 流程：no-traffic deploy（canary tag）→ smoke test(/healthz) → promote traffic to latest
+# ✅ 加入可選 Debug：_DEBUG_MODE=1 時才會跑「route:list」
 
 substitutions:
   _SERVICE: "cicd-repo"
@@ -11,6 +12,9 @@ substitutions:
 
   # smoke test path
   _SMOKE_PATH: "/up"
+
+  # ✅ Debug 開關：手動 Run 時填 1 才會跑 route:list
+  _DEBUG_MODE: "0"
 
 options:
   logging: CLOUD_LOGGING_ONLY
@@ -29,6 +33,31 @@ steps:
           --format='value(status.traffic[0].revisionName)')
         echo "Current revision: $${CURRENT_REV}"
         echo -n "$${CURRENT_REV}" > /workspace/current_rev.txt
+
+  # ✅ (可選) Debug：在 Cloud Build 直接跑 image 內的 php artisan route:list（不需要 SSH/exec）
+  # 只在 _DEBUG_MODE=1 時執行，預設跳過
+  - name: gcr.io/cloud-builders/docker
+    id: "Debug (optional) - php artisan route:list in image"
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+
+        if [ "${_DEBUG_MODE}" != "1" ]; then
+          echo "Skip debug routes (set _DEBUG_MODE=1 to enable)"
+          exit 0
+        fi
+
+        echo "Pull image: ${_IMAGE}"
+        docker pull "${_IMAGE}"
+
+        echo "Run: php artisan route:list (grep: healthz|about)"
+        docker run --rm \
+          -e APP_ENV=production \
+          -e APP_KEY=base64:dummykeydummykeydummykeydummykeydummykeydummy= \
+          "${_IMAGE}" \
+          sh -lc 'cd /var/www && php artisan route:list | grep -E "healthz|about" -n || true'
 
   # 1) no-traffic 部署新 revision，並加 canary tag 產生測試 URL
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
