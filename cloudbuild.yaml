@@ -44,21 +44,65 @@ steps:
       - --tag=canary
       - --quiet
 
-  # 2) 取得 canary URL
+  # 2) 取得「剛部署完成且 Ready」的 revision name（最穩，不靠 traffic url）
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
-    id: "Get canary URL"
+    id: "Get latest ready revision"
     entrypoint: bash
     args:
       - -c
       - |
-        set -e
-        CANARY_URL=$$(gcloud run services describe "${_SERVICE}" \
-          --region "${_REGION}" \
-          --format='value(status.traffic[?percent==0].url)')
-        echo "Canary URL: $${CANARY_URL}"
-        echo -n "$${CANARY_URL}" > /workspace/canary_url.txt
+        set -euo pipefail
 
-  # 3) Smoke test
+        # 等待 latestReadyRevisionName 出現（避免狀態 propagation timing）
+        for i in 1 2 3 4 5 6 7 8 9 10; do
+          REV=$$(gcloud run services describe "${_SERVICE}" \
+            --region "${_REGION}" \
+            --format='value(status.latestReadyRevisionName)')
+
+          if [ -n "$${REV}" ]; then
+            echo "Latest ready revision: $${REV}"
+            echo -n "$${REV}" > /workspace/canary_rev.txt
+            exit 0
+          fi
+
+          echo "Waiting for latest ready revision... attempt $$i"
+          sleep 2
+        done
+
+        echo "❌ Cannot get latest ready revision"
+        exit 1
+
+  # 3) 用 revision name 取得 revision URL（這個 URL 會直接打到該 revision，即使 0% traffic）
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    id: "Get revision URL"
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+
+        REV="$$(cat /workspace/canary_rev.txt)"
+
+        # 等待 revision status.url 出現（有時也會稍晚）
+        for i in 1 2 3 4 5 6 7 8 9 10; do
+          REV_URL=$$(gcloud run revisions describe "$${REV}" \
+            --region "${_REGION}" \
+            --format='value(status.url)')
+
+          if [ -n "$${REV_URL}" ]; then
+            echo "Revision URL: $${REV_URL}"
+            echo -n "$${REV_URL}" > /workspace/canary_url.txt
+            exit 0
+          fi
+
+          echo "Waiting for revision URL... attempt $$i"
+          sleep 2
+        done
+
+        echo "❌ Cannot get revision URL for: $${REV}"
+        exit 1
+
+  # 4) Smoke test（打 revision URL，確保測到新 revision，不是舊的 100% service）
   - name: curlimages/curl:8.5.0
     id: "Smoke test"
     entrypoint: sh
@@ -66,18 +110,25 @@ steps:
       - -c
       - |
         set -e
+
         CANARY_URL="$$(cat /workspace/canary_url.txt)"
         echo "Hitting: $${CANARY_URL}${_SMOKE_PATH}"
+
         for i in 1 2 3 4 5; do
           code="$$(curl -sS -o /dev/null -w "%{http_code}" "$${CANARY_URL}${_SMOKE_PATH}" || true)"
           echo "Attempt $$i -> HTTP $${code}"
-          if [ "$${code}" = "200" ]; then exit 0; fi
+          if [ "$${code}" = "200" ]; then
+            echo "✅ Smoke test passed"
+            exit 0
+          fi
           sleep 2
         done
+
         echo "❌ Smoke test failed"
+        echo "Current revision (rollback hint): $$(cat /workspace/current_rev.txt || true)"
         exit 1
 
-  # 4) 成功才切 100% 流量到 latest revision
+  # 5) 成功才切 100% 流量到 latest revision
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
     id: "Promote traffic to latest"
     entrypoint: gcloud
