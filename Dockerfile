@@ -26,14 +26,6 @@ COPY app/. .
 # ✅ 清 cache（包含 route cache），避免舊快取卡住新路由
 RUN php artisan optimize:clear || true
 
-RUN echo "$APP_ENV"
-# ✅ production 才做 optimize（會產生 route/config/view cache）
-RUN if [ "$APP_ENV" = "production" ]; then \
-      php artisan optimize; \
-    else \
-      echo "Skip optimize (APP_ENV=$APP_ENV)"; \
-    fi
-
 RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
 
 # Cloud Run 會注入 PORT 環境變數（通常 8080）
