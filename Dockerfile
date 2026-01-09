@@ -29,4 +29,4 @@ RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
 ENV PORT=8080
 
 # 重要：一定要綁 0.0.0.0，而且 port 用 $PORT
-CMD ["sh", "-c", "php -S 0.0.0.0:${PORT} -t public"]
+CMD ["sh", "-c", "php -S 0.0.0.0:${PORT} -t public public/index.php"]
