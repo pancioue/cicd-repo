@@ -12,7 +12,7 @@ Route::get('/about', function () {
 
 
 Route::get('/healthz', function () {
-    return response('ok', 200);
+    return 'healthy';
 });
 
 Route::get('/test', function () {

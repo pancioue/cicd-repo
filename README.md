@@ -301,7 +301,7 @@ gcloud run services update-traffic YOUR_SERVICE \
 新增了 cloudbuild.yaml 後就可以手動部署看看
 ![manul_deploy](/image/manul_deploy/manul_deploy_choose_branch.jpg)
 
-UI手動建立似乎沒有法加入tag選項，預設似乎是抓 最後一版或latest
+UI手動建立似乎沒有法加入tag選項，預設是抓 latest 版號
 (不過使用 CLI 應該可以指定 tag，沒試過)
 
 在 _cloudbuild.yaml_ 可以指定 Image 版本，不過如果每次都要手動改 code 似乎不太好，原則上應該是用 latest
