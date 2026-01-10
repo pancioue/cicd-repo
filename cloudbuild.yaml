@@ -30,7 +30,7 @@ steps:
         set -e
         CURRENT_REV=$$(gcloud run services describe "${_SERVICE}" \
           --region "${_REGION}" \
-          --format='value(status.traffic[0].revisionName)')
+          --format='value(status.traffic[?percent==100].revisionName)')
         echo "Current revision: $${CURRENT_REV}"
         echo -n "$${CURRENT_REV}" > /workspace/current_rev.txt
 
@@ -74,32 +74,32 @@ steps:
       - --quiet
 
   # 1.5) 部署後執行一次性 Job：php artisan route:clear
-  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
-    id: "Run job: php artisan route:clear"
-    entrypoint: bash
-    args:
-      - -c
-      - |
-        set -euo pipefail
-        JOB_NAME="php-artisan-route-clear"
+  # - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+  #   id: "Run job: php artisan route:clear"
+  #   entrypoint: bash
+  #   args:
+  #     - -c
+  #     - |
+  #       set -euo pipefail
+  #       JOB_NAME="php-artisan-route-clear"
 
-        if ! gcloud run jobs describe "$${JOB_NAME}" --region "${_REGION}" --format='value(metadata.name)' >/dev/null 2>&1; then
-          echo "Create job: $${JOB_NAME}"
-          gcloud run jobs create "$${JOB_NAME}" \
-            --region "${_REGION}" \
-            --image "${_IMAGE}" \
-            --command "php" \
-            --args "artisan","route:clear" \
-            --quiet
-        else
-          echo "Job exists: $${JOB_NAME}"
-        fi
+  #       if ! gcloud run jobs describe "$${JOB_NAME}" --region "${_REGION}" --format='value(metadata.name)' >/dev/null 2>&1; then
+  #         echo "Create job: $${JOB_NAME}"
+  #         gcloud run jobs create "$${JOB_NAME}" \
+  #           --region "${_REGION}" \
+  #           --image "${_IMAGE}" \
+  #           --command "php" \
+  #           --args "artisan","route:clear" \
+  #           --quiet
+  #       else
+  #         echo "Job exists: $${JOB_NAME}"
+  #       fi
 
-        echo "Execute job: $${JOB_NAME}"
-        gcloud run jobs execute "$${JOB_NAME}" \
-          --region "${_REGION}" \
-          --wait \
-          --quiet
+  #       echo "Execute job: $${JOB_NAME}"
+  #       gcloud run jobs execute "$${JOB_NAME}" \
+  #         --region "${_REGION}" \
+  #         --wait \
+  #         --quiet
 
   # 2) 取得 service URL，並「自己組出」canary tag URL：https://canary---<service_id>.run.app
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk

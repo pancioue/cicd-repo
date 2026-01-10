@@ -22,11 +22,3 @@ Route::get('/test', function () {
 Route::get('/abc123', function () {
     return response('123321', 200);
 });
-
-Route::get('/onemore', function () {
-    return 'onemore';
-});
-
-Route::get('/two', function () {
-    return 'two';
-});
