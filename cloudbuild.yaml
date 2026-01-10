@@ -30,7 +30,7 @@ steps:
         set -e
         CURRENT_REV=$$(gcloud run services describe "${_SERVICE}" \
           --region "${_REGION}" \
-          --format='value(status.traffic.filter(percent=100).revisionName)')
+          --format='value(status.traffic.latestRevision')
         echo "Current revision: $${CURRENT_REV}"
         echo -n "$${CURRENT_REV}" > /workspace/current_rev.txt
 
