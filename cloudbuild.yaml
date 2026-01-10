@@ -52,12 +52,12 @@ steps:
         echo "Pull image: ${_IMAGE}"
         docker pull "${_IMAGE}"
 
-        echo "Run: php artisan route:list (grep: healthz|about)"
+        echo "Run: php artisan route:list"
         docker run --rm \
           -e APP_ENV=production \
           -e APP_KEY=base64:dummykeydummykeydummykeydummykeydummykeydummy= \
           "${_IMAGE}" \
-          sh -lc 'cd /var/www && php artisan route:list | grep -E "healthz|about" -n || true'
+          sh -lc 'cd /var/www && php artisan route:list'
 
   # 1) no-traffic 部署新 revision，並加 canary tag 產生測試 URL
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
