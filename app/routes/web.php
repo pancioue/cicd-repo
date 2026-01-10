@@ -26,3 +26,7 @@ Route::get('/abc123', function () {
 Route::get('/onemore', function () {
     return 'onemore';
 });
+
+Route::get('/two', function () {
+    return 'two';
+});
