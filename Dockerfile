@@ -24,7 +24,7 @@ RUN if [ "$APP_ENV" = "production" ]; then \
 COPY app/. .
 
 # ✅ 清 cache（包含 route cache），避免舊快取卡住新路由
-RUN php artisan optimize:clear || true
+RUN rm -f bootstrap/cache/*.php
 
 RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
 

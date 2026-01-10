@@ -38,3 +38,7 @@ Route::get('/three', function () {
 Route::get('/four', function () {
     return response('444', 200);
 });
+
+Route::get('/five', function () {
+    return response('555', 200);
+});
