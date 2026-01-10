@@ -8,7 +8,8 @@ substitutions:
   _REGION: "asia-east1"
 
   # ✅ 不用 TAG_NAME：直接部署 latest（你 GitHub Actions main build 會推這個）
-  _IMAGE: "asia-east1-docker.pkg.dev/cicd-learning-483517/cicd-learngin-registry/pancioue/cicd-repo:latest"
+  # _IMAGE: "asia-east1-docker.pkg.dev/cicd-learning-483517/cicd-learngin-registry/pancioue/cicd-repo:latest"
+  _IMAGE: "ghcr.io/pancioue/cicd-repo:latest"
 
   # smoke test path
   _SMOKE_PATH: "/up"
