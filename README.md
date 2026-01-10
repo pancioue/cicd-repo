@@ -378,10 +378,16 @@ Canary deployment 是一種部署策略，
 * 快速
 * 輕量
 * 驗證「服務有沒有起來、基本功能是否可用」
-* 通常是 /healthz, /up, /ping
+* 通常是 /healthz, /up, /ping  # laravel不管怎麼試都打不通/healthz，可能 cloud run有前面擋掉這路由
 
 
 
+可以在 cloud shell 下這指令，查看相關欄位
+``` shell
+gcloud run services describe "<repo-name>" \
+  --region "asia-east1" \
+  --format="json(status)"
+```
 
 
 
