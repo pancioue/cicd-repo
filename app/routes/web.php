@@ -30,3 +30,7 @@ Route::get('/one', function () {
 Route::get('/two', function () {
     return response('222', 200);
 });
+
+Route::get('/three', function () {
+    return response('333', 200);
+});
