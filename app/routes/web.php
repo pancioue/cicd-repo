@@ -22,3 +22,7 @@ Route::get('/test', function () {
 Route::get('/abc123', function () {
     return response('123321', 200);
 });
+
+Route::get('/one', function () {
+    return response('111', 200);
+});
