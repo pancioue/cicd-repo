@@ -45,7 +45,14 @@ steps:
           -H "Authorization: Bearer $$GHCR_PAT" \
           "https://ghcr.io/token?service=ghcr.io&scope=repository:$$OWNER/$$REPO:pull")"
 
-        REGISTRY_TOKEN="$$(echo "$$TOKEN_JSON" | python -c "import sys,json; print(json.load(sys.stdin)['token'])")"
+        # 👉 不用 python，直接用 sed 抽 token
+        REGISTRY_TOKEN="$$(echo "$$TOKEN_JSON" | sed -n 's/.*"token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+
+        if [ -z "$$REGISTRY_TOKEN" ]; then
+          echo "❌ Failed to extract registry token from GHCR response"
+          echo "$$TOKEN_JSON"
+          exit 1
+        fi
 
         # 2) 取 manifest header 的 Docker-Content-Digest
         GHCR_DIGEST="$$(curl -sSI \
@@ -55,13 +62,12 @@ steps:
           | tr -d '\r' | awk -F': ' 'tolower($$1)=="docker-content-digest"{print $$2}')"
 
         if [ -z "$$GHCR_DIGEST" ]; then
-          echo "❌ Cannot read GHCR Docker-Content-Digest (check token permissions / repo visibility)"
+          echo "❌ Cannot read GHCR Docker-Content-Digest"
           exit 1
         fi
 
         echo "✅ GHCR latest digest: $$GHCR_DIGEST"
 
-        # ✅ 你要的：AR base + GHCR digest
         FINAL_IMAGE="${_IMAGE}@$$GHCR_DIGEST"
         echo "✅ Final image ref: $$FINAL_IMAGE"
         echo -n "$$FINAL_IMAGE" > /workspace/image.txt

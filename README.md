@@ -380,6 +380,13 @@ Canary deployment 是一種部署策略，
 * 驗證「服務有沒有起來、基本功能是否可用」
 * 通常是 /healthz, /up, /ping  # laravel不管怎麼試都打不通/healthz，可能 cloud run有前面擋掉這路由
 
+這里的坑非常多
+* cloudbuild.yaml中
+  `_IMAGE: "asia-east1-docker.pkg.dev/<Project>/<Registry>/pancioue/cicd-repo:latest"`
+  這種形式似乎不會正確去抓 latest 版本， 儘管有設定 Artifact Registry
+* 讓cloudbuild可以存取 Secret Manager 密鑰存取者
+  - Cloud Build -> 權限 -> 下方 Secret Manager 密鑰存取者 啟用
+
 
 
 可以在 cloud shell 下這指令，查看相關欄位
