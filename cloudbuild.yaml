@@ -7,7 +7,6 @@ substitutions:
   _SERVICE: "cicd-repo"
   _REGION: "asia-east1"
 
-  # ✅ Artifact Registry（你已設定 remote 對 GHCR）
   # 這裡放 repo base，不要帶 tag / digest
   _IMAGE: "asia-east1-docker.pkg.dev/cicd-learning-483517/cicd-learngin-registry/pancioue/cicd-repo"
 
@@ -71,7 +70,6 @@ steps:
           echo "❌ Cannot read GHCR Docker-Content-Digest"
           exit 1
         fi
-
 
         echo "✅ GHCR latest digest: $$GHCR_DIGEST"
 
