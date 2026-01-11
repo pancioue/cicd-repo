@@ -34,11 +34,3 @@ Route::get('/two', function () {
 Route::get('/three', function () {
     return response('333', 200);
 });
-
-Route::get('/four', function () {
-    return response('444', 200);
-});
-
-Route::get('/five', function () {
-    return response('555', 200);
-});

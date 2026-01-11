@@ -1,27 +1,66 @@
 # cloudbuild.yaml (UI manual run friendly)
 # 目標：UI 手動 Run（預設 main）也能部署，不依賴 TAG_NAME
-# 流程：no-traffic deploy（canary tag）→ smoke test(/healthz) → promote traffic to latest
+# 流程：no-traffic deploy（canary tag）→ smoke test(/up) → promote traffic to latest
 # ✅ 加入可選 Debug：_DEBUG_MODE=1 時才會跑「route:list」
 
 substitutions:
   _SERVICE: "cicd-repo"
   _REGION: "asia-east1"
 
-  # ✅ 不用 TAG_NAME：直接部署 latest（你 GitHub Actions main build 會推這個）
-  _IMAGE: "asia-east1-docker.pkg.dev/cicd-learning-483517/cicd-learngin-registry/pancioue/cicd-repo@sha256:1af4683d4784fc0556905b9b164d6958c807059f48dc046a7f7012a2012f15b8"
-  # _IMAGE: "ghcr.io/pancioue/cicd-repo:latest"
+  # ✅ 你 AR (remote to GHCR) 的 repo base
+  _IMAGE: "asia-east1-docker.pkg.dev/cicd-learning-483517/cicd-learngin-registry/pancioue/cicd-repo"
 
-  # smoke test path
   _SMOKE_PATH: "/up"
-
-  # ✅ Debug 開關：手動 Run 時填 1 才會跑 route:list
   _DEBUG_MODE: "0"
+
+availableSecrets:
+  secretManager:
+    - versionName: projects/897396234110/secrets/gcp-artifact-registry-ghcr-cicd-repo/versions/1
+      env: "GHCR_PAT"
 
 options:
   logging: CLOUD_LOGGING_ONLY
 
 steps:
-  # 0) 記錄目前線上 100% 的 revision（供你需要時手動回滾用）
+  # 0) 取得 GHCR latest digest，並組出 FINAL_IMAGE=_IMAGE@sha256:...
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    id: "Resolve image digest (GHCR) and write final image ref"
+    entrypoint: bash
+    secretEnv: ["GHCR_PAT"]
+    args:
+      - -c
+      - |
+        set -euo pipefail
+
+        OWNER="pancioue"
+        REPO="cicd-repo"
+        TAG="latest"
+
+        TOKEN_JSON=$(curl -sS \
+          -H "Authorization: Bearer ${GHCR_PAT}" \
+          "https://ghcr.io/token?service=ghcr.io&scope=repository:${OWNER}/${REPO}:pull")
+
+        REGISTRY_TOKEN=$(echo "$TOKEN_JSON" | python -c "import sys,json; print(json.load(sys.stdin)['token'])")
+
+        GHCR_DIGEST=$(curl -sSI \
+          -H "Authorization: Bearer ${REGISTRY_TOKEN}" \
+          -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
+          "https://ghcr.io/v2/${OWNER}/${REPO}/manifests/${TAG}" \
+          | tr -d '\r' | awk -F': ' 'tolower($1)=="docker-content-digest"{print $2}')
+
+        if [ -z "$GHCR_DIGEST" ]; then
+          echo "❌ Cannot read GHCR Docker-Content-Digest (check token permissions / repo visibility)"
+          exit 1
+        fi
+
+        echo "✅ GHCR latest digest: ${GHCR_DIGEST}"
+
+        # ✅ 這就是後面要統一使用的 image（AR + digest）
+        FINAL_IMAGE="${_IMAGE}@${GHCR_DIGEST}"
+        echo "✅ Final image ref: ${FINAL_IMAGE}"
+        echo -n "${FINAL_IMAGE}" > /workspace/image.txt
+
+  # 1) 記錄目前線上 100% 的 revision（供你需要時手動回滾用）
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
     id: "Capture current revision"
     entrypoint: bash
@@ -35,8 +74,7 @@ steps:
         echo "Current revision: $${CURRENT_REV}"
         echo -n "$${CURRENT_REV}" > /workspace/current_rev.txt
 
-  # ✅ (可選) Debug：在 Cloud Build 直接跑 image 內的 php artisan route:list（不需要 SSH/exec）
-  # 只在 _DEBUG_MODE=1 時執行，預設跳過
+  # ✅ (可選) Debug：在 Cloud Build 直接跑 image 內的 php artisan route:list
   - name: gcr.io/cloud-builders/docker
     id: "Debug (optional) - php artisan route:list in image"
     entrypoint: bash
@@ -50,31 +88,35 @@ steps:
           exit 0
         fi
 
-        echo "Pull image: ${_IMAGE}"
-        docker pull "${_IMAGE}"
+        IMAGE="$$(cat /workspace/image.txt)"
+        echo "Pull image: $${IMAGE}"
+        docker pull "$${IMAGE}"
 
         echo "Run: php artisan route:list"
         docker run --rm \
           -e APP_ENV=production \
           -e APP_KEY=base64:dummykeydummykeydummykeydummykeydummykeydummy= \
-          "${_IMAGE}" \
+          "$${IMAGE}" \
           sh -lc 'cd /var/www && php artisan route:list'
 
-  # 1) no-traffic 部署新 revision，並加 canary tag 產生測試 URL
+  # 2) no-traffic 部署新 revision，並加 canary tag 產生測試 URL
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
     id: "Deploy (no-traffic) with canary tag"
-    entrypoint: gcloud
+    entrypoint: bash
     args:
-      - run
-      - deploy
-      - ${_SERVICE}
-      - --image=${_IMAGE}
-      - --region=${_REGION}
-      - --no-traffic
-      - --tag=canary
-      - --quiet
+      - -c
+      - |
+        set -euo pipefail
+        IMAGE="$$(cat /workspace/image.txt)"
 
-  # 1.5) 部署後執行一次性 Job：php artisan route:clear
+        gcloud run deploy "${_SERVICE}" \
+          --image="$${IMAGE}" \
+          --region="${_REGION}" \
+          --no-traffic \
+          --tag=canary \
+          --quiet
+
+  # 2.5) 部署後執行一次性 Job：php artisan route:clear
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
     id: "Run job: php artisan route:clear"
     entrypoint: bash
@@ -82,13 +124,14 @@ steps:
       - -c
       - |
         set -euo pipefail
+        IMAGE="$$(cat /workspace/image.txt)"
         JOB_NAME="php-artisan-route-clear"
 
         if ! gcloud run jobs describe "$${JOB_NAME}" --region "${_REGION}" --format='value(metadata.name)' >/dev/null 2>&1; then
           echo "Create job: $${JOB_NAME}"
           gcloud run jobs create "$${JOB_NAME}" \
             --region "${_REGION}" \
-            --image "${_IMAGE}" \
+            --image "$${IMAGE}" \
             --command "php" \
             --args "artisan","route:clear" \
             --quiet
@@ -102,7 +145,7 @@ steps:
           --wait \
           --quiet
 
-  # 2) 取得 service URL，並「自己組出」canary tag URL：https://canary---<service_id>.run.app
+  # 3) 取得 service URL，並「自己組出」canary tag URL：https://canary---<service_id>.run.app
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
     id: "Compute canary URL from service URL"
     entrypoint: bash
@@ -120,14 +163,13 @@ steps:
           exit 1
         fi
 
-        # 將 https:// 後面插入 canary---
         CANARY_URL="$${SERVICE_URL/https:\/\//https:\/\/canary---}"
 
         echo "Service URL: $${SERVICE_URL}"
         echo "Canary URL:  $${CANARY_URL}"
         echo -n "$${CANARY_URL}" > /workspace/canary_url.txt
 
-  # 3) Smoke test（打 canary tag URL，確保測到新 revision）
+  # 4) Smoke test（打 canary tag URL，確保測到新 revision）
   - name: curlimages/curl:8.5.0
     id: "Smoke test"
     entrypoint: sh
@@ -152,7 +194,7 @@ steps:
         echo "Current 100% revision (rollback hint): $$(cat /workspace/current_rev.txt || true)"
         exit 1
 
-  # 4) 成功才切 100% 流量到 latest revision
+  # 5) 成功才切 100% 流量到 latest revision
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
     id: "Promote traffic to latest"
     entrypoint: gcloud
