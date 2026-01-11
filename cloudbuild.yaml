@@ -19,7 +19,7 @@ substitutions:
 
 availableSecrets:
   secretManager:
-    - versionName: projects/897396234110/secrets/gcp-artifact-registry-ghcr-cicd-repo/versions/1
+    - versionName: projects/897396234110/secrets/gcp-artifact-registry-ghcr-cicd-repo/versions/latest
       env: GHCR_PAT
 
 options:
