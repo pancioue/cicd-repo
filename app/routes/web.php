@@ -34,3 +34,7 @@ Route::get('/two', function () {
 Route::get('/three', function () {
     return response('333', 200);
 });
+
+Route::get('/final', function () {
+    return response('final', 200);
+});
