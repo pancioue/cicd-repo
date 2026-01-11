@@ -93,6 +93,7 @@ steps:
         echo -n "$${CURRENT_REV}" > /workspace/current_rev.txt
 
   # ✅ (可選) Debug：在 Cloud Build 直接跑 image 內的 php artisan route:list（不需要 SSH/exec）
+  # 只在 _DEBUG_MODE=1 時執行，預設跳過
   - name: gcr.io/cloud-builders/docker
     id: "Debug (optional) - php artisan route:list in image"
     entrypoint: bash
