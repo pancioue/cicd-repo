@@ -7,24 +7,26 @@ substitutions:
   _SERVICE: "cicd-repo"
   _REGION: "asia-east1"
 
-  # ✅ 你 AR (remote to GHCR) 的 repo base
   _IMAGE: "asia-east1-docker.pkg.dev/cicd-learning-483517/cicd-learngin-registry/pancioue/cicd-repo"
 
+  # smoke test path
   _SMOKE_PATH: "/up"
+
+  # ✅ Debug 開關：手動 Run 時填 1 才會跑 route:list
   _DEBUG_MODE: "0"
 
 availableSecrets:
   secretManager:
     - versionName: projects/897396234110/secrets/gcp-artifact-registry-ghcr-cicd-repo/versions/1
-      env: "GHCR_PAT"
+      env: GHCR_PAT
 
 options:
   logging: CLOUD_LOGGING_ONLY
 
 steps:
-  # 0) 取得 GHCR latest digest，並組出 FINAL_IMAGE=_IMAGE@sha256:...
+  # 0) 取得 GHCR latest digest，並組出 FINAL_IMAGE = _IMAGE@sha256:...
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
-    id: "Resolve image digest (GHCR) and write final image ref"
+    id: "Resolve digest from GHCR and write final image"
     entrypoint: bash
     secretEnv: ["GHCR_PAT"]
     args:
@@ -36,29 +38,32 @@ steps:
         REPO="cicd-repo"
         TAG="latest"
 
-        TOKEN_JSON=$(curl -sS \
-          -H "Authorization: Bearer ${GHCR_PAT}" \
-          "https://ghcr.io/token?service=ghcr.io&scope=repository:${OWNER}/${REPO}:pull")
+        # 1) 用 PAT 換 registry token（scoped）
+        TOKEN_JSON="$(curl -sS \
+          -H "Authorization: Bearer $GHCR_PAT" \
+          "https://ghcr.io/token?service=ghcr.io&scope=repository:$OWNER/$REPO:pull")"
 
-        REGISTRY_TOKEN=$(echo "$TOKEN_JSON" | python -c "import sys,json; print(json.load(sys.stdin)['token'])")
+        REGISTRY_TOKEN="$(echo "$TOKEN_JSON" | python -c "import sys,json; print(json.load(sys.stdin)['token'])")"
 
-        GHCR_DIGEST=$(curl -sSI \
-          -H "Authorization: Bearer ${REGISTRY_TOKEN}" \
+        # 2) 取 manifest header 的 Docker-Content-Digest
+        GHCR_DIGEST="$(curl -sSI \
+          -H "Authorization: Bearer $REGISTRY_TOKEN" \
           -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
-          "https://ghcr.io/v2/${OWNER}/${REPO}/manifests/${TAG}" \
-          | tr -d '\r' | awk -F': ' 'tolower($1)=="docker-content-digest"{print $2}')
+          "https://ghcr.io/v2/$OWNER/$REPO/manifests/$TAG" \
+          | tr -d '\r' | awk -F': ' 'tolower($1)=="docker-content-digest"{print $2}')"
 
         if [ -z "$GHCR_DIGEST" ]; then
           echo "❌ Cannot read GHCR Docker-Content-Digest (check token permissions / repo visibility)"
           exit 1
         fi
 
-        echo "✅ GHCR latest digest: ${GHCR_DIGEST}"
+        echo "✅ GHCR latest digest: $GHCR_DIGEST"
 
-        # ✅ 這就是後面要統一使用的 image（AR + digest）
-        FINAL_IMAGE="${_IMAGE}@${GHCR_DIGEST}"
-        echo "✅ Final image ref: ${FINAL_IMAGE}"
-        echo -n "${FINAL_IMAGE}" > /workspace/image.txt
+        # ✅ 你要的：AR base + GHCR digest
+        FINAL_IMAGE="${_IMAGE}@$GHCR_DIGEST"
+        echo "✅ Final image ref: $FINAL_IMAGE"
+
+        echo -n "$FINAL_IMAGE" > /workspace/image.txt
 
   # 1) 記錄目前線上 100% 的 revision（供你需要時手動回滾用）
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
@@ -74,7 +79,8 @@ steps:
         echo "Current revision: $${CURRENT_REV}"
         echo -n "$${CURRENT_REV}" > /workspace/current_rev.txt
 
-  # ✅ (可選) Debug：在 Cloud Build 直接跑 image 內的 php artisan route:list
+  # ✅ (可選) Debug：在 Cloud Build 直接跑 image 內的 php artisan route:list（不需要 SSH/exec）
+  # 只在 _DEBUG_MODE=1 時執行，預設跳過
   - name: gcr.io/cloud-builders/docker
     id: "Debug (optional) - php artisan route:list in image"
     entrypoint: bash
@@ -163,6 +169,7 @@ steps:
           exit 1
         fi
 
+        # 將 https:// 後面插入 canary---
         CANARY_URL="$${SERVICE_URL/https:\/\//https:\/\/canary---}"
 
         echo "Service URL: $${SERVICE_URL}"
