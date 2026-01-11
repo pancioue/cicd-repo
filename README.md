@@ -378,24 +378,27 @@ Canary deployment 是一種部署策略，
 * 快速
 * 輕量
 * 驗證「服務有沒有起來、基本功能是否可用」
-* 通常是 /healthz, /up, /ping  # laravel不管怎麼試都打不通/healthz，可能 cloud run有前面擋掉這路由
+* 通常是 /healthz, /up, /ping  
 
 這里的坑非常多
 * cloudbuild.yaml中
   `_IMAGE: "asia-east1-docker.pkg.dev/<Project>/<Registry>/pancioue/cicd-repo:latest"`
   這種形式似乎不會正確去抓 latest 版本，儘管有設定 Artifact Registry 
-  必須使用GHCR的 sha 
+  必須使用GHCR的 sha，但要抓到 sha 值也很麻煩
 * 讓cloudbuild可以存取 Secret Manager 密鑰存取者
   - Cloud Build -> 權限 -> 下方 Secret Manager 密鑰存取者 啟用
+* `--format='value(status.traffic[0].revisionName)'`
+  當有兩個以上運組的版本，traffic[0]是抓第一個
+  可以在 cloud shell 下這指令，查看相關欄位
+  ``` shell
+  gcloud run services describe "<repo-name>" \
+    --region "asia-east1" \
+    --format="json(status)"
+  ```
+* 不管怎麼試都打不通/healthz，可能 cloud run有前面擋掉這路由
 
-
-
-可以在 cloud shell 下這指令，查看相關欄位
-``` shell
-gcloud run services describe "<repo-name>" \
-  --region "asia-east1" \
-  --format="json(status)"
-```
+打通這裡很辛苦，不太優雅，建議別走這條路
+要用手動部署，可能試試直接上傳到 GCP的 Artifact Registry 可能會簡單點
 
 
 
