@@ -373,9 +373,9 @@ UI手動建立似乎沒有法加入tag選項，預設是抓 latest 版號
 * cloudbuild.yaml中
   `_IMAGE: "asia-east1-docker.pkg.dev/<Project>/<Registry>/pancioue/cicd-repo:latest"`
   這種形式似乎不會正確去抓 latest 版本，起初的方向以為是 route cache，後來發現是 image 版本不對  
-
-  儘管有設定 Artifact Registry 
+  儘管有設定 Artifact Registry(可以到Artifact->Project->Registry確認是否有設連結了)，
   必須使用GHCR的 digest，但要抓到 digest 也很麻煩，這份 cloudbuild.yaml是最後測試成功的版本
+* 當遇到類似情況，可以先到 Cloud Run->service的修訂版本的檢查映像檔，是否是指定的版本
 * 讓 cloudbuild可以存取 Secret Manager 密鑰存取者(在上面步驟中有建立的)
   > Cloud Build -> 權限 -> 下方 Secret Manager 密鑰存取者 啟用
 * `--format='value(status.traffic[0].revisionName)'`
@@ -388,8 +388,8 @@ UI手動建立似乎沒有法加入tag選項，預設是抓 latest 版號
   ```
 * 不管怎麼試都打不通/healthz，可能 cloud run有前面擋掉這路由
 
-打通這裡很辛苦，不太優雅，建議別走這條路
-要用手動部署，可以試試直接上傳到 GCP的 Artifact Registry 可能會簡單點
+打通這裡很辛苦，不太優雅，不太建議走這條路
+若要用手動部署，可以試試直接上傳到 GCP的 Artifact Registry 可能會簡單點
 
 ### 名詞解釋
 * Canary deployment

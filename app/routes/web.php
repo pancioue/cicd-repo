@@ -18,23 +18,3 @@ Route::get('/healthz', function () {
 Route::get('/test', function () {
     return response('test', 200);
 });
-
-Route::get('/abc123', function () {
-    return response('123321', 200);
-});
-
-Route::get('/one', function () {
-    return response('111', 200);
-});
-
-Route::get('/two', function () {
-    return response('222', 200);
-});
-
-Route::get('/three', function () {
-    return response('333', 200);
-});
-
-Route::get('/four', function () {
-    return response('four', 200);
-});

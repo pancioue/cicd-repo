@@ -8,6 +8,7 @@ substitutions:
   _REGION: "asia-east1"
 
   # 這裡放 repo base，不要帶 tag / digest
+  # 注意 Artifact Registry 是否有有設置這存放區連結到 GHCR
   _IMAGE: "asia-east1-docker.pkg.dev/cicd-learning-483517/cicd-learngin-registry/pancioue/cicd-repo"
 
   # smoke test path
