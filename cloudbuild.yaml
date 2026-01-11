@@ -7,6 +7,8 @@ substitutions:
   _SERVICE: "cicd-repo"
   _REGION: "asia-east1"
 
+  # ✅ Artifact Registry（你已設定 remote 對 GHCR）
+  # 這裡放 repo base，不要帶 tag / digest
   _IMAGE: "asia-east1-docker.pkg.dev/cicd-learning-483517/cicd-learngin-registry/pancioue/cicd-repo"
 
   # smoke test path
@@ -39,31 +41,30 @@ steps:
         TAG="latest"
 
         # 1) 用 PAT 換 registry token（scoped）
-        TOKEN_JSON="$(curl -sS \
-          -H "Authorization: Bearer $GHCR_PAT" \
-          "https://ghcr.io/token?service=ghcr.io&scope=repository:$OWNER/$REPO:pull")"
+        TOKEN_JSON="$$(curl -sS \
+          -H "Authorization: Bearer $$GHCR_PAT" \
+          "https://ghcr.io/token?service=ghcr.io&scope=repository:$$OWNER/$$REPO:pull")"
 
-        REGISTRY_TOKEN="$(echo "$TOKEN_JSON" | python -c "import sys,json; print(json.load(sys.stdin)['token'])")"
+        REGISTRY_TOKEN="$$(echo "$$TOKEN_JSON" | python -c "import sys,json; print(json.load(sys.stdin)['token'])")"
 
         # 2) 取 manifest header 的 Docker-Content-Digest
-        GHCR_DIGEST="$(curl -sSI \
-          -H "Authorization: Bearer $REGISTRY_TOKEN" \
+        GHCR_DIGEST="$$(curl -sSI \
+          -H "Authorization: Bearer $$REGISTRY_TOKEN" \
           -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
-          "https://ghcr.io/v2/$OWNER/$REPO/manifests/$TAG" \
-          | tr -d '\r' | awk -F': ' 'tolower($1)=="docker-content-digest"{print $2}')"
+          "https://ghcr.io/v2/$$OWNER/$$REPO/manifests/$$TAG" \
+          | tr -d '\r' | awk -F': ' 'tolower($$1)=="docker-content-digest"{print $$2}')"
 
-        if [ -z "$GHCR_DIGEST" ]; then
+        if [ -z "$$GHCR_DIGEST" ]; then
           echo "❌ Cannot read GHCR Docker-Content-Digest (check token permissions / repo visibility)"
           exit 1
         fi
 
-        echo "✅ GHCR latest digest: $GHCR_DIGEST"
+        echo "✅ GHCR latest digest: $$GHCR_DIGEST"
 
         # ✅ 你要的：AR base + GHCR digest
-        FINAL_IMAGE="${_IMAGE}@$GHCR_DIGEST"
-        echo "✅ Final image ref: $FINAL_IMAGE"
-
-        echo -n "$FINAL_IMAGE" > /workspace/image.txt
+        FINAL_IMAGE="${_IMAGE}@$$GHCR_DIGEST"
+        echo "✅ Final image ref: $$FINAL_IMAGE"
+        echo -n "$$FINAL_IMAGE" > /workspace/image.txt
 
   # 1) 記錄目前線上 100% 的 revision（供你需要時手動回滾用）
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
@@ -80,7 +81,6 @@ steps:
         echo -n "$${CURRENT_REV}" > /workspace/current_rev.txt
 
   # ✅ (可選) Debug：在 Cloud Build 直接跑 image 內的 php artisan route:list（不需要 SSH/exec）
-  # 只在 _DEBUG_MODE=1 時執行，預設跳過
   - name: gcr.io/cloud-builders/docker
     id: "Debug (optional) - php artisan route:list in image"
     entrypoint: bash
@@ -95,14 +95,14 @@ steps:
         fi
 
         IMAGE="$$(cat /workspace/image.txt)"
-        echo "Pull image: $${IMAGE}"
-        docker pull "$${IMAGE}"
+        echo "Pull image: $$IMAGE"
+        docker pull "$$IMAGE"
 
         echo "Run: php artisan route:list"
         docker run --rm \
           -e APP_ENV=production \
           -e APP_KEY=base64:dummykeydummykeydummykeydummykeydummykeydummy= \
-          "$${IMAGE}" \
+          "$$IMAGE" \
           sh -lc 'cd /var/www && php artisan route:list'
 
   # 2) no-traffic 部署新 revision，並加 canary tag 產生測試 URL
@@ -116,7 +116,7 @@ steps:
         IMAGE="$$(cat /workspace/image.txt)"
 
         gcloud run deploy "${_SERVICE}" \
-          --image="$${IMAGE}" \
+          --image="$$IMAGE" \
           --region="${_REGION}" \
           --no-traffic \
           --tag=canary \
@@ -133,20 +133,20 @@ steps:
         IMAGE="$$(cat /workspace/image.txt)"
         JOB_NAME="php-artisan-route-clear"
 
-        if ! gcloud run jobs describe "$${JOB_NAME}" --region "${_REGION}" --format='value(metadata.name)' >/dev/null 2>&1; then
-          echo "Create job: $${JOB_NAME}"
-          gcloud run jobs create "$${JOB_NAME}" \
+        if ! gcloud run jobs describe "$$JOB_NAME" --region "${_REGION}" --format='value(metadata.name)' >/dev/null 2>&1; then
+          echo "Create job: $$JOB_NAME"
+          gcloud run jobs create "$$JOB_NAME" \
             --region "${_REGION}" \
-            --image "$${IMAGE}" \
+            --image "$$IMAGE" \
             --command "php" \
             --args "artisan","route:clear" \
             --quiet
         else
-          echo "Job exists: $${JOB_NAME}"
+          echo "Job exists: $$JOB_NAME"
         fi
 
-        echo "Execute job: $${JOB_NAME}"
-        gcloud run jobs execute "$${JOB_NAME}" \
+        echo "Execute job: $$JOB_NAME"
+        gcloud run jobs execute "$$JOB_NAME" \
           --region "${_REGION}" \
           --wait \
           --quiet
@@ -164,17 +164,16 @@ steps:
           --region "${_REGION}" \
           --format='value(status.url)')
 
-        if [ -z "$${SERVICE_URL}" ]; then
+        if [ -z "$$SERVICE_URL" ]; then
           echo "❌ Cannot get service URL"
           exit 1
         fi
 
-        # 將 https:// 後面插入 canary---
         CANARY_URL="$${SERVICE_URL/https:\/\//https:\/\/canary---}"
 
-        echo "Service URL: $${SERVICE_URL}"
-        echo "Canary URL:  $${CANARY_URL}"
-        echo -n "$${CANARY_URL}" > /workspace/canary_url.txt
+        echo "Service URL: $$SERVICE_URL"
+        echo "Canary URL:  $$CANARY_URL"
+        echo -n "$$CANARY_URL" > /workspace/canary_url.txt
 
   # 4) Smoke test（打 canary tag URL，確保測到新 revision）
   - name: curlimages/curl:8.5.0
@@ -185,12 +184,12 @@ steps:
       - |
         set -e
         CANARY_URL="$$(cat /workspace/canary_url.txt)"
-        echo "Hitting: $${CANARY_URL}${_SMOKE_PATH}"
+        echo "Hitting: $$CANARY_URL${_SMOKE_PATH}"
 
         for i in 1 2 3 4 5; do
-          code="$$(curl -sS -o /dev/null -w "%{http_code}" "$${CANARY_URL}${_SMOKE_PATH}" || true)"
-          echo "Attempt $$i -> HTTP $${code}"
-          if [ "$${code}" = "200" ]; then
+          code="$$(curl -sS -o /dev/null -w "%{http_code}" "$$CANARY_URL${_SMOKE_PATH}" || true)"
+          echo "Attempt $$i -> HTTP $$code"
+          if [ "$$code" = "200" ]; then
             echo "✅ Smoke test passed"
             exit 0
           fi
