@@ -363,30 +363,21 @@ UI手動建立似乎沒有法加入tag選項，預設是抓 latest 版號
 ![GHCR key](/image/manul_deploy/ghcr_key.jpg)
 
 ### cloudbuild.yaml
-* 可以指定 Image 版本，不過如果每次都要手動改版號似有些麻煩，原則上應該是用 latest
+* 可以指定 Image 版本，這邊起初是用 latest 測試，不過這邊有個坑，可以參考下面
 * 這份 `cloudbuild.yaml` 包含了 
   `Canary deployment + Smoke test`
   這裡算是卡關滿久的，cloudbuild.yaml 是很容易卡關的地方
+* 當中有幾個步驟是打印 _route:list_ 與清除快取 _route:clear_，是中途debug用，不是必要的，不過就留著供日後參考用
 
-#### Canary deployment
-Canary deployment 是一種部署策略，
-先讓「新版本」只接觸極少量或隔離的流量，
-確認穩定後，再逐步或一次性切換成正式版本。
-
-#### Smoke Test
-定義是：
-* 快速
-* 輕量
-* 驗證「服務有沒有起來、基本功能是否可用」
-* 通常是 /healthz, /up, /ping  
-
-這里的坑非常多
+### 容易誤入的坑
 * cloudbuild.yaml中
   `_IMAGE: "asia-east1-docker.pkg.dev/<Project>/<Registry>/pancioue/cicd-repo:latest"`
-  這種形式似乎不會正確去抓 latest 版本，儘管有設定 Artifact Registry 
-  必須使用GHCR的 sha，但要抓到 sha 值也很麻煩
-* 讓cloudbuild可以存取 Secret Manager 密鑰存取者
-  - Cloud Build -> 權限 -> 下方 Secret Manager 密鑰存取者 啟用
+  這種形式似乎不會正確去抓 latest 版本，起初的方向以為是 route cache，後來發現是 image 版本不對  
+
+  儘管有設定 Artifact Registry 
+  必須使用GHCR的 digest，但要抓到 digest 也很麻煩，這份 cloudbuild.yaml是最後測試成功的版本
+* 讓 cloudbuild可以存取 Secret Manager 密鑰存取者(在上面步驟中有建立的)
+  > Cloud Build -> 權限 -> 下方 Secret Manager 密鑰存取者 啟用
 * `--format='value(status.traffic[0].revisionName)'`
   當有兩個以上運組的版本，traffic[0]是抓第一個
   可以在 cloud shell 下這指令，查看相關欄位
@@ -398,7 +389,20 @@ Canary deployment 是一種部署策略，
 * 不管怎麼試都打不通/healthz，可能 cloud run有前面擋掉這路由
 
 打通這裡很辛苦，不太優雅，建議別走這條路
-要用手動部署，可能試試直接上傳到 GCP的 Artifact Registry 可能會簡單點
+要用手動部署，可以試試直接上傳到 GCP的 Artifact Registry 可能會簡單點
+
+### 名詞解釋
+* Canary deployment
+Canary deployment 是一種部署策略，
+先讓「新版本」只接觸極少量或隔離的流量，
+確認穩定後，再逐步或一次性切換成正式版本。
+
+* Smoke Test
+定義是：
+  - 快速
+  - 輕量
+  - 驗證「服務有沒有起來、基本功能是否可用」
+  - 通常是 /healthz, /up, /ping  
 
 
 
