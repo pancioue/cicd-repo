@@ -40,12 +40,12 @@ steps:
         REPO="cicd-repo"
         TAG="latest"
 
-        # 1) 用 PAT 換 registry token（scoped）
+        # ✅ 用 GitHub username + PAT 做 Basic Auth 去換 registry token
         TOKEN_JSON="$$(curl -sS \
-          -H "Authorization: Bearer $$GHCR_PAT" \
+          -u "$$OWNER:$$GHCR_PAT" \
           "https://ghcr.io/token?service=ghcr.io&scope=repository:$$OWNER/$$REPO:pull")"
 
-        # 👉 不用 python，直接用 sed 抽 token
+        # 取 token（不用 python/jq）
         REGISTRY_TOKEN="$$(echo "$$TOKEN_JSON" | sed -n 's/.*"token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
 
         if [ -z "$$REGISTRY_TOKEN" ]; then
@@ -54,7 +54,7 @@ steps:
           exit 1
         fi
 
-        # 2) 取 manifest header 的 Docker-Content-Digest
+        # 取 manifest digest
         GHCR_DIGEST="$$(curl -sSI \
           -H "Authorization: Bearer $$REGISTRY_TOKEN" \
           -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
