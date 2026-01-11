@@ -383,7 +383,8 @@ Canary deployment 是一種部署策略，
 這里的坑非常多
 * cloudbuild.yaml中
   `_IMAGE: "asia-east1-docker.pkg.dev/<Project>/<Registry>/pancioue/cicd-repo:latest"`
-  這種形式似乎不會正確去抓 latest 版本， 儘管有設定 Artifact Registry
+  這種形式似乎不會正確去抓 latest 版本，儘管有設定 Artifact Registry 
+  必須使用GHCR的 sha 
 * 讓cloudbuild可以存取 Secret Manager 密鑰存取者
   - Cloud Build -> 權限 -> 下方 Secret Manager 密鑰存取者 啟用
 
