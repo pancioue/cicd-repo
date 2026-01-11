@@ -45,7 +45,6 @@ steps:
           -u "$$OWNER:$$GHCR_PAT" \
           "https://ghcr.io/token?service=ghcr.io&scope=repository:$$OWNER/$$REPO:pull")"
 
-        # 取 token（不用 python/jq）
         REGISTRY_TOKEN="$$(echo "$$TOKEN_JSON" | sed -n 's/.*"token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
 
         if [ -z "$$REGISTRY_TOKEN" ]; then
@@ -54,17 +53,25 @@ steps:
           exit 1
         fi
 
-        # 取 manifest digest
-        GHCR_DIGEST="$$(curl -sSI \
+        # 取 manifest digest（同時印出 http code / headers 方便除錯）
+        HEADERS_FILE="/workspace/manifest_headers.txt"
+        HTTP_CODE="$$(curl -sS -D "$$HEADERS_FILE" -o /dev/null -w "%{http_code}" \
           -H "Authorization: Bearer $$REGISTRY_TOKEN" \
-          -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
-          "https://ghcr.io/v2/$$OWNER/$$REPO/manifests/$$TAG" \
-          | tr -d '\r' | awk -F': ' 'tolower($$1)=="docker-content-digest"{print $$2}')"
+          -H "Accept: application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json" \
+          "https://ghcr.io/v2/$$OWNER/$$REPO/manifests/$$TAG" || true)"
+
+        echo "Manifest HTTP status: $$HTTP_CODE"
+        echo "---- manifest response headers ----"
+        sed -n '1,120p' "$$HEADERS_FILE" | tr -d '\r'
+        echo "----------------------------------"
+
+        GHCR_DIGEST="$$(tr -d '\r' < "$$HEADERS_FILE" | awk -F': ' 'tolower($$1)=="docker-content-digest"{print $$2}')"
 
         if [ -z "$$GHCR_DIGEST" ]; then
           echo "❌ Cannot read GHCR Docker-Content-Digest"
           exit 1
         fi
+
 
         echo "✅ GHCR latest digest: $$GHCR_DIGEST"
 
