@@ -357,41 +357,39 @@ gcloud run services update-traffic YOUR_SERVICE \
 
 ![發佈版本標籤](/image/deploy_via_release/trigger_tag.jpg)
 
-這樣一來只有當發布 `v.` 開頭的 tag 才會部署
+這樣一來當發布 `v.` 開頭的 tag 時就會部署  
+值得一提的是，使用這個部署方式，`ci-release.yml`(release types: [published])
+跟 Cloud Build 會同時觸發。這種情況下，`ci-release.yml` 似乎意義不大
+
 
 ## 手動部署
-如果不想要自動合進main就部署，可以改成手動部署
 先到Cloud Build / 觸發條件 把剛才的觸發條件先停用
 建立新的觸發條件選擇手動叫用
-
-
-* 這邊要選擇 Cloud Build 設定欓做示範，例如 Canary deployment + Smoke test
-  👉 完整執行你定義的 pipeline
-
-![manul_deploy](/image/manul_deploy/manul_deploy_config.jpg)
-
-新增了 cloudbuild.yaml 後就可以手動部署看看
-![manul_deploy](/image/manul_deploy/manul_deploy_choose_branch.jpg)
+![手動叫用部署](/image/manul_deploy/manul_deploy_config.jpg)
 
 UI手動建立似乎沒有法加入tag選項，預設是抓 latest 版號
-(不過使用 CLI 應該可以指定 tag，沒試過)
+(不過使用 CLI 應該可以指定 tag)
+![manul_deploy](/image/manul_deploy/manul_deploy_choose_branch.jpg)
 
+## 自定義 pipeline
+* 這邊Cloud Build 設定欓選擇自定義的 cloudbuild.yaml，示範 Canary deployment + Smoke test
+  👉 完整執行你定義的 pipeline
+![自定義pipeline](/image/cloudbuild_pipeline/cloudbuild_pipeline.jpg)
+
+新增了 cloudbuild.yaml 後就可以部署看看
+- - -
 為了讓 Cloud Build 可以讀取 GHCR.io 必須先設定 Artifact Registry
 ![artifact registry](/image/manul_deploy/artifact_registry.jpg)
 上面大概是必須要填的欄位，其中驗證模式比較麻煩，
 密鑰需要新增，這裡填上面的 GHCR 時得到的 key
 ![GHCR key](/image/manul_deploy/ghcr_key.jpg)
 
+
 ### cloudbuild.yaml
 * 可以指定 Image 版本，這邊起初是用 latest 測試，不過這邊有個坑，可以參考下面
 * 這份 `cloudbuild.yaml` 包含了 
   `Canary deployment + Smoke test`
-<<<<<<< Updated upstream
-  這裡算是卡關滿久的，cloudbuild.yaml 是很容易卡關的地方
 * 當中有幾個步驟是打印 _route:list_ 與清除快取 _route:clear_，是中途debug用，不是必要的，不過就留著供日後參考用
-=======
-  cloudbuild.yaml 是很容易卡關的地方，
->>>>>>> Stashed changes
 
 ### 容易誤入的坑
 * cloudbuild.yaml中
@@ -410,10 +408,10 @@ UI手動建立似乎沒有法加入tag選項，預設是抓 latest 版號
     --region "asia-east1" \
     --format="json(status)"
   ```
-* 不管怎麼試都打不通/healthz，可能 cloud run有前面擋掉這路由
+* 不管怎麼試都打不通 `/healthz`，可能 cloud run有前面擋掉這路由
 
-打通這裡很辛苦，不太優雅，不太建議走這條路
-若要用手動部署，可以試試直接上傳到 GCP的 Artifact Registry 可能會簡單點
+打通這裡很辛苦，不太優雅，
+如果要使用自定義的 pipeline，可以試試直接上傳到 GCP的 Artifact Registry 可能會簡單點
 
 ### 名詞解釋
 * Canary deployment
