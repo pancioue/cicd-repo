@@ -350,10 +350,14 @@ gcloud run services update-traffic YOUR_SERVICE \
 ```
 
 
-
 ## 發佈時部署
 > 如果不想要只要合進 main 就會觸發部署的狀況，可以調整為發佈時部署
 
+![發佈時部署](/image/deploy_via_release/trigger_release.jpg)
+
+![發佈版本標籤](/image/deploy_via_release/trigger_tag.jpg)
+
+這樣一來只有當發布 `v.` 開頭的 tag 才會部署
 
 ## 手動部署
 如果不想要自動合進main就部署，可以改成手動部署

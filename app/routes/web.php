@@ -18,3 +18,7 @@ Route::get('/healthz', function () {
 Route::get('/test', function () {
     return response('test', 200);
 });
+
+Route::get('/one', function () {
+    return response('one', 200);
+});
