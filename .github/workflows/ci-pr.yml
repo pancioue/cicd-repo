@@ -4,7 +4,28 @@ on:
   pull_request:
     branches: [ "main" ]
 
+concurrency:
+  group: ci-pr-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  lint:
+    name: Lint (workflows + Dockerfile)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # ✅ 檢查 .github/workflows/*.yml
+      - name: actionlint
+        uses: raven-actions/actionlint@v1
+
+      # ✅ 檢查 Dockerfile
+      - name: hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+          ignore: DL3008
+
   test:
     runs-on: ubuntu-latest
     steps:
@@ -18,8 +39,33 @@ jobs:
       - name: Install dependencies
         working-directory: app
         run: composer install --no-interaction --prefer-dist --no-progress
-  
+
+      - name: Composer validate (strict)
+        working-directory: app
+        run: composer validate --strict
+
+      - name: Static analysis (Larastan/PHPStan)
+        working-directory: app
+        run: |
+          vendor/bin/phpstan analyse -c phpstan.neon --no-progress
+
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      docker: ${{ steps.filter.outputs.docker }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            docker:
+              - 'Dockerfile'
+              - 'app/**'
+
   docker-build:
+    needs: changes
+    if: needs.changes.outputs.docker == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,6 +81,5 @@ jobs:
           push: false
           build-args: |
             APP_ENV=production
-          cache-from: type=gha # 快取加速用
-          cache-to: type=gha,mode=max # 快取加速用
-
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
