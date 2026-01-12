@@ -218,27 +218,31 @@ jobs:
 * 不確定要查多久 / 影響範圍大 → 先 revert 讓 main 先活過來，再慢慢查
 
 ## 部署
-可以先使用 Cloud Run
+可以先使用 Cloud Run(providing auto-scaling HTTP services)
+![建立服務](/image/cloud_run/create_service.jpg)
 
+這裡選擇 Cloud Build，以下是官方對 Cloud Build的說明
 
-### 設定 Cloud Build 持續部署功能
 > 只要使用 Cloud Build 的持續部署功能，您就能將原始碼存放區的異動內容自動更新至 Artifact Registry 中的容器映像檔，並部署至 Cloud Run。
   您的程式碼應透過 $PORT 監聽 HTTP 要求，存放區中則須包含 Dockerfile 或 Go、Node.js、Python、Java、.NET Core 或 Ruby 的原始碼，以便建構到容器映像檔中。
 
-這是官方對於 Cloud Build 的說明，簡單來說就是會自動部署
-* 也可以選擇 Developer Connect 試試
+這是官方對於 Cloud Build 的說明，簡單來說
+* Cloud Build「負責部署」
+* Cloud Run「負責上線後服務」
 
+### 設定 Cloud Build 持續部署功能
+![Cloud Build 設定](/image/cloud_run/Cloud_Build_config.jpg)
 
-## 部署觸發設定調整
-如果剛設定好的時候，可能會發生只要合進 main 就會觸發部署的狀況，
-初始建置好像沒辦法設定這麼多，可以更改設定
+會跟github要權限
+![Cloug Build github auth](/image/cloud_run/Cloud_Build_github_auth.jpg)
 
-### 在部署的時候可能會有一瞬間，剛好 request 進來，而剛好正在部署新版本 這樣有沒有可能造成 request 錯誤？
-有可能，但 Cloud Run 已經把「部署時切版本」這件事做得接近零停機
-大致上是:
-> Cloud Run 會先把「新請求」導向新 revision，同時讓舊 revision 把「已在處理中的請求」跑完；等舊 revision 沒流量、又空閒一段時間後，才會被關掉。
+下一步
+![Cloud Build step 2](/image/cloud_run/Cloud_Build_step2.jpg)
 
-## 部署完後 500 server error
+剛設定好的時候，只要合進 main 就會觸發部署的狀況，
+初始建置好像沒辦法設定這麼多，不過之後可以調整設定
+
+### 部署完後 500 server error
 這邊有兩個問題
 * 需要設定環境變數
 * GCP上查不到 log 
@@ -250,7 +254,7 @@ jobs:
 > 要看到真正錯誤，你的程式必須把錯誤輸出到：
    * stdout / stderr（Cloud Run 會自動收集）
 
-### 設定環境變數
+#### 設定環境變數
 在 Cloud Run 設定環境變數
 1. GCP Console → Cloud Run
 2. 點你的 service（cicd-repo）
@@ -265,7 +269,7 @@ jobs:
 
 部署完後再打一次首頁，去 Logs 就應該會看到 run.googleapis.com/stderr 出現 Laravel 的錯誤堆疊。
 
-### 如果你的 Laravel 沒有 stderr channel
+#### 如果你的 Laravel 沒有 stderr channel
 在 `config/logging.php` 加一個 channel
 ```php
 'channels' => [
@@ -282,18 +286,22 @@ jobs:
 ],
 ```
 
-### database 環就變數
+#### database 環就變數
 改完以上之後應該還是會看到錯誤
 `Database file at path [/var/www/database/database.sqlite] does not exist`
 
 `php artisan migrate` 會產生 database.sqlite
 因為cloud run環境沒有執行 php artisan migrate，所以不會有這檔案會出錯
 
-新增環境變數
-SESSION_DRIVER=cookie
+* 新增環境變數
+  `SESSION_DRIVER=cookie`
+  測試用 cookie 即可
 
-測試用 cookie 即可
-
+### Q & A
+在部署的時候可能會有一瞬間，剛好 request 進來，而剛好正在部署新版本 這樣有沒有可能造成 request 錯誤？
+有可能，但 Cloud Run 已經把「部署時切版本」這件事做得接近零停機
+大致上是:
+> Cloud Run 會先把「新請求」導向新 revision，同時讓舊 revision 把「已在處理中的請求」跑完；等舊 revision 沒流量、又空閒一段時間後，才會被關掉。
 
 ## rollback
 ### 情況一：部署「直接啟動失敗」👉 Cloud Run 會自動保護你
@@ -325,12 +333,13 @@ SESSION_DRIVER=cookie
 步驟：
 1. Cloud Run → 你的服務
 2. 修訂版本（Revisions）
+  ![rollback version](/image/rollback/rollback_version.jpg)
 3. 找到上一個「Healthy / 成功」的 Revision
 4. 將流量設為 100%
+  ![rollback traffic](/image/rollback/rollback_traffic.jpg)
 5. 儲存
 
 👉 立即生效，幾乎零中斷
-
 
 - - -
 方式二：CLI 回滾
@@ -341,11 +350,18 @@ gcloud run services update-traffic YOUR_SERVICE \
 ```
 
 
+
+## 發佈時部署
+> 如果不想要只要合進 main 就會觸發部署的狀況，可以調整為發佈時部署
+
+
 ## 手動部署
 如果不想要自動合進main就部署，可以改成手動部署
 先到Cloud Build / 觸發條件 把剛才的觸發條件先停用
 建立新的觸發條件選擇手動叫用
-* 注意設定一定要選擇 Cloud Build 設定欓
+
+
+* 這邊要選擇 Cloud Build 設定欓做示範，例如 Canary deployment + Smoke test
   👉 完整執行你定義的 pipeline
 
 ![manul_deploy](/image/manul_deploy/manul_deploy_config.jpg)
@@ -366,8 +382,12 @@ UI手動建立似乎沒有法加入tag選項，預設是抓 latest 版號
 * 可以指定 Image 版本，這邊起初是用 latest 測試，不過這邊有個坑，可以參考下面
 * 這份 `cloudbuild.yaml` 包含了 
   `Canary deployment + Smoke test`
+<<<<<<< Updated upstream
   這裡算是卡關滿久的，cloudbuild.yaml 是很容易卡關的地方
 * 當中有幾個步驟是打印 _route:list_ 與清除快取 _route:clear_，是中途debug用，不是必要的，不過就留著供日後參考用
+=======
+  cloudbuild.yaml 是很容易卡關的地方，
+>>>>>>> Stashed changes
 
 ### 容易誤入的坑
 * cloudbuild.yaml中
@@ -404,7 +424,10 @@ Canary deployment 是一種部署策略，
   - 驗證「服務有沒有起來、基本功能是否可用」
   - 通常是 /healthz, /up, /ping  
 
-
+## Pub/Sub 訊息 是什麼時候用的
+1️⃣ 非 Git 事件觸發部署
+2️⃣ 跨系統、自動化流程
+Pub/Sub 是 「當 Git 不夠用時」的進階解法
 
 ## 2) 加一個最基本的 Test Job（CI 才完整）
 
