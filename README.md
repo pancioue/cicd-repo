@@ -374,6 +374,7 @@ UI手動建立似乎沒有法加入tag選項，預設是抓 latest 版號
 ## 自定義 pipeline
 * 這邊Cloud Build 設定欓選擇自定義的 cloudbuild.yaml，示範 Canary deployment + Smoke test
   👉 完整執行你定義的 pipeline
+* 手動部署似乎沒有預設的寫入內嵌 YAML，選用內嵌 YAML跑會失敗
 ![自定義pipeline](/image/cloudbuild_pipeline/cloudbuild_pipeline.jpg)
 
 新增了 cloudbuild.yaml 後就可以部署看看
@@ -383,7 +384,6 @@ UI手動建立似乎沒有法加入tag選項，預設是抓 latest 版號
 上面大概是必須要填的欄位，其中驗證模式比較麻煩，
 密鑰需要新增，這裡填上面的 GHCR 時得到的 key
 ![GHCR key](/image/manul_deploy/ghcr_key.jpg)
-
 
 ### cloudbuild.yaml
 * 可以指定 Image 版本，這邊起初是用 latest 測試，不過這邊有個坑，可以參考下面
@@ -411,7 +411,7 @@ UI手動建立似乎沒有法加入tag選項，預設是抓 latest 版號
 * 不管怎麼試都打不通 `/healthz`，可能 cloud run有前面擋掉這路由
 
 打通這裡很辛苦，不太優雅，
-如果要使用自定義的 pipeline，可以試試直接上傳到 GCP的 Artifact Registry 可能會簡單點
+如果要使用手動部署+自定義的 pipeline，可以試試直接上傳到 GCP的 Artifact Registry 可能會簡單點
 
 ### 名詞解釋
 * Canary deployment
