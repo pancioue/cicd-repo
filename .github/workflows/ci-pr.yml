@@ -5,6 +5,22 @@ on:
     branches: [ "main" ]
 
 jobs:
+  lint:
+    name: Lint (workflows + Dockerfile)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # ✅ 檢查 .github/workflows/*.yml
+      - name: actionlint
+        uses: raven-actions/actionlint@v1
+
+      # ✅ 檢查 Dockerfile
+      - name: hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+
   test:
     runs-on: ubuntu-latest
     steps:
@@ -18,7 +34,23 @@ jobs:
       - name: Install dependencies
         working-directory: app
         run: composer install --no-interaction --prefer-dist --no-progress
-  
+
+      # ✅ 低成本靜態驗證
+      - name: Composer validate (strict)
+        working-directory: app
+        run: composer validate --strict
+
+      - name: PHP syntax check (php -l)
+        working-directory: app
+        run: |
+          find . -name "*.php" -print0 | xargs -0 -n1 php -l
+
+      # ✅ Larastan / PHPStan
+      - name: Static analysis (Larastan/PHPStan)
+        working-directory: app
+        run: |
+          vendor/bin/phpstan analyse -c phpstan.neon
+
   docker-build:
     runs-on: ubuntu-latest
     steps:
