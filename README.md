@@ -70,9 +70,8 @@ docker run myapp:abc123
 
 這是「切版本」，不是「修環境」
 
-## 初始環境
-專案結構
-```bash
+## 檔案結構
+```
 your-repo/
   app/ ...
   docker/
@@ -85,6 +84,9 @@ your-repo/
     ci-release.yml
 ```
 
+### ci-pr.yml
+發pr前的檢測，包含
+* 
 ### ci-release.yml 
 ```
 name: CI - Release (Build & Push Version + SHA)
@@ -240,7 +242,8 @@ jobs:
 ![Cloud Build step 2](/image/cloud_run/Cloud_Build_step2.jpg)
 
 剛設定好的時候，只要合進 main 就會觸發部署的狀況，
-初始建置好像沒辦法設定這麼多，不過之後可以調整設定
+初始建置好像沒辦法設定這麼多，不過之後可以調整設定。 
+不過使這個部署方式，ci-main (push branches: ["main"])與cloud基本上是同時觸發，要特別注意
 
 ### 部署完後 500 server error
 這邊有兩個問題
@@ -359,7 +362,7 @@ gcloud run services update-traffic YOUR_SERVICE \
 
 這樣一來當發布 `v.` 開頭的 tag 時就會部署  
 值得一提的是，使用這個部署方式，`ci-release.yml`(release types: [published])
-跟 Cloud Build 會同時觸發。這種情況下，`ci-release.yml` 似乎意義不大
+跟 Cloud Build 會同時觸發。
 
 
 ## 手動部署

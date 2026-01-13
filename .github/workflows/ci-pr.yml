@@ -49,6 +49,10 @@ jobs:
         run: |
           vendor/bin/phpstan analyse -c phpstan.neon --no-progress
 
+      - name: Run unit tests (artisan)
+        working-directory: app
+        run: php artisan test --testsuite=Unit
+
   changes:
     runs-on: ubuntu-latest
     outputs:
