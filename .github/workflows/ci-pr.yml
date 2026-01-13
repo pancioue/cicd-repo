@@ -27,6 +27,7 @@ jobs:
           ignore: DL3008
 
   test:
+    name: Test (PHP 8.4)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -48,6 +49,10 @@ jobs:
         working-directory: app
         run: |
           vendor/bin/phpstan analyse -c phpstan.neon --no-progress
+
+      - name: Run unit tests (artisan)
+        working-directory: app
+        run: php artisan test --testsuite=Unit
 
   changes:
     runs-on: ubuntu-latest
