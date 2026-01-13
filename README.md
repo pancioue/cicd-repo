@@ -70,41 +70,18 @@ docker run myapp:abc123
 
 這是「切版本」，不是「修環境」
 
-## 檔案結構
-```
-your-repo/
-  app/ ...
-  docker/
-    nginx/default.conf
-  Dockerfile
-  docker-compose.yml
-  .github/workflows/
-    ci-pr.yml
-    ci-main.yml
-    ci-release.yml
-```
-
-### ci-pr.yml
-發pr前的檢測，包含
-* 
-### ci-release.yml 
-```
-name: CI - Release (Build & Push Version + SHA)
-
-on:
-  release: # 當發佈一版時會執行
-    types: [published]
-
-...
-```
-
-開始一個基本的 laravel 專案
-```bash
-docker run --rm -u "$(id -u):$(id -g)" \
-  -v "$PWD/app":/app -w /app \
-  composer:2 \
-  create-project laravel/laravel .
-```
+## CI檔案結構
+* __ci-pr.yml__
+  發pr前的檢測，包含
+  - workflow lint
+  - Dockerfile lint
+  - unit test
+  - PHP 靜態分析
+  - 如果有變更檔案，則 docker-build
+* __ci-main.yml__
+  合併到 main 以後會觸發
+* __ci-release.yml__ 
+  發佈一版時觸發
 
 
 ## 到 github 產生 GHCR token
@@ -144,55 +121,6 @@ docker push ghcr.io/<OWNER>/<REPO>:local-test
 成功後，去repo 頁面右側看 Packages（或你的 GitHub profile → Packages），應該會出現剛 push 的 local-test。
 
 若有看到上傳成功，表示剛才的 token 
-
-## Build and push
-修改 __ci-main.yml__
-``` yml
-name: CI - Main (Build & Push Image)
-
-on:
-  push:
-    branches: ["main"]
-
-permissions:
-  contents: read
-  packages: write
-
-jobs:
-  build-and-push:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Compute tags
-        id: meta
-        run: |
-          SHORT_SHA="${GITHUB_SHA::7}"
-          echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
-
-      - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          build-args: |
-            APP_ENV=production
-          tags: |
-            ghcr.io/pancioue/cicd-repo:latest
-            ghcr.io/pancioue/cicd-repo:sha-${{ steps.meta.outputs.short_sha }}
-```
 
 
 ## 情境1. 防止 merge時 build 失敗(ci-main.yml)

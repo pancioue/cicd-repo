@@ -15,7 +15,7 @@ final class TaxCalculatorTest extends TestCase
         $tax = $calculator->calculateTax(10000, 5.5);
         $gross = $calculator->calculateGross(10000, 5.5);
 
-        $this->assertSame(551, $tax);
+        $this->assertSame(550, $tax);
         $this->assertSame(10550, $gross);
     }
 
