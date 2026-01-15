@@ -326,13 +326,12 @@ UI手動建立似乎沒有法加入tag選項，預設是抓 latest 版號
 打通這裡很辛苦，不太優雅，如果要使用手動部署+自定義的 pipeline，可以試試直接上傳到 GCP的 Artifact Registry 可能會簡單點
 
 ### 名詞解釋
-* Canary deployment
+* Canary deployment  
 Canary deployment 是一種部署策略，
 先讓「新版本」只接觸極少量或隔離的流量，
 確認穩定後，再逐步或一次性切換成正式版本。
 
-* Smoke Test
-定義是：
+* Smoke Test定義是：
   - 快速
   - 輕量
   - 驗證「服務有沒有起來、基本功能是否可用」
