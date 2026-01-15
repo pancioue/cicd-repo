@@ -1,74 +1,61 @@
-首先要先了解，即使沒有docker，依然可以做CICD
-但有無docker差異很大
+## 前言
+首先要先釐清一件事：
+> 即使沒有 Docker，也可以做 CI/CD  
+> 但是否能做到「穩定、可回滾、可擴展」，差異非常大。
 
-| 面向            | 無 Docker | 有 Docker |
-| -------------  | -------- | -------- |
-| 部署一致性       | ❌        | ✅        |
-| CI/CD 解耦      | ❌        | ✅        |
-| 回滾            | ❌        | ✅        |
-| 可重現性         | ❌        | ✅        |
-| scale / cloud   | ❌        | ✅        |
+差異不在於「有沒有用 Docker」，  
+而在於有沒有產生一個不可變的部署成品（Immutable Artifact）。  
 
-0️⃣ 先給你一個總結版（先有全貌）
+Docker image 只是目前最常見、也最成熟的實作方式。
+| 面向            | 無 Immutable Artifact | 有 Immutable Artifact（如 Docker） |
+| -------------  | --------------------  | ------------------------------ |
+| 部署一致性       | ❌                    | ✅                              |
+| CI / CD 解耦    | ❌                    | ✅                              |
+| 回滾能力         | ❌                    | ✅                              |
+| 可重現性         | ❌                    | ✅                              |
+| scale / cloud  | ❌                    | ✅                              |
 
-Docker 的價值不是「比較潮」，而是：
+Docker 的價值不在於「比較潮」，而在於：
+> 把「部署時會變動的東西」提前鎖死在 CI 階段  
+> 讓 CD 只需要做一件事：切換版本
 
-> 把「部署時會變動的東西」提前鎖死在 CI 階段，讓 CD 只做一件事：換版本
-
-沒有 Docker → 部署是一連串命令
-有 Docker → 部署是一個版本切換
-
-
-有無 docker 差異
--------
-
+### 有無 Docker（Artifact）差異
 1️⃣ 部署一致性（Deployment Consistency）
-沒有 Docker 時，CD 通常在機器上做：
-``` bash
+
+❌ 沒有 Docker / Artifact 時  
+部署通常是在目標環境直接執行一連串指令：
+```
 git pull
 composer install
 npm install
 npm run build
 php artisan migrate
 ```
+✅ 有 Docker（Immutable Artifact）時  
+👉 部署不再是「重跑流程」，  
+👉 而是「啟動一個已經驗證過的版本」。
+- - -
+2️⃣ CI / CD 解耦（Decoupling）
+有了 Artifact 之後：
+* CI 負責產生版本
+* CD 負責切換版本
+- - -
+3️⃣ 回滾（Rollback） 
 
-✅ 有 Docker 為什麼一致？
+❌ 沒有 Docker / Artifact 時的回滾  
 
-CI 階段 build image
-image 是 immutable artifact
-CD 只做：
-``` bash
-docker pull myapp:sha
-docker run myapp:sha
-```
+回滾通常代表要「嘗試回到某個過去狀態」：
+* git checkout 上一版
+* 還原 vendor
+* 還原 build assets
+* 重新跑整個部署流程
+👉 試圖回到的那個環境，其實早已不存在。
 
-2️⃣ CI/CD 解耦（Decoupling）
-3️⃣ 回滾（Rollback）
-❌ 沒 Docker 為什麼痛苦？
+✅ 有 Docker（Immutable Artifact）時的回滾  
 
-Rollback 你要：
- * git checkout 上一版
- * 還原 vendor
- * 還原 build assets
- * 重新跑部署流程
+在Cloud Run中切換版本很簡單，僅需幾個鍵按一按就切過去了  
+是真的版本切換，而不是 修復環境。
 
-👉 你在「回到某個狀態」，但那個狀態已經不在了
-
-✅ Docker 回滾為什麼秒殺？
-因為你已經有：
-``` bash
-myapp:abc123
-myapp:def456
-```
-Rollback =：
-```bash
-docker run myapp:abc123
-```
-👉 不重 build
-👉 不重裝依賴
-👉 不碰主機環境
-
-這是「切版本」，不是「修環境」
 
 ## CI檔案結構
 * __ci-pr.yml__
@@ -80,17 +67,18 @@ docker run myapp:abc123
   - 如果有變更檔案，則 docker-build
 * __ci-main.yml__
   合併到 main 以後會觸發
+  - 登入到 GHCR
+  - build and push image
 * __ci-release.yml__ 
-  發佈一版時觸發
+  發佈一版時觸發  
+  基本上跟 __ci-main__ 差不多，多了一個版號
 
 
 ## 到 github 產生 GHCR token
-GitHub → Settings → Developer settings → Personal access tokens
-注意只能選擇 Token (classic)
+`GitHub → Settings → Developer settings → Personal access tokens`  
+* 注意只能選擇 Token (classic)，用 Fine-grained token（新版）會找不到 `read:packages`、`write:packages`
 
-這裡說的
-https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry
-GCP說建議用 Fine-grained token（新版）會找不到 `read:packages`、`write:packages`
+[官方文件說明](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry)
 
 ## 登入 GHCR
 在本機登入 GHCR（Docker）
@@ -117,22 +105,17 @@ docker build --build-arg APP_ENV=production -t ghcr.io/<OWNER>/<REPO>:local-test
 ```bash
 docker push ghcr.io/<OWNER>/<REPO>:local-test
 ```
-
-成功後，去repo 頁面右側看 Packages（或你的 GitHub profile → Packages），應該會出現剛 push 的 local-test。
-
-若有看到上傳成功，表示剛才的 token 
-
+成功後，去repo 頁面右側看 Packages（或 GitHub profile → Packages），應該會出現剛 push 的 local-test。
 
 ## 情境1. 防止 merge時 build 失敗(ci-main.yml)
-> 首先要注意的是，沒有按下 merge 後如果build失敗就不給合併這功能
-> github 的 branch protection 實際上要用發 pr 時就要先 check build 會不會失敗
+> 首先要注意的是，沒有按下 merge 後如果build失敗就不給合併這功能  
+> github 的 branch protection 實際上要用發 pr 時就要先 check build 會不會失敗  
 > 如果依據設定的 check 條件或 job 跑失敗，就不能按下 merge 鈕
 
-最常見的標準做法：不要讓它 merge（用 branch protection）
+最常見的標準做法：不要讓它 merge（用 branch protection）  
 理想狀態：CI 沒過，GitHub 不允許 merge。
 
 做法是 GitHub 設定：
-
 * Settings → Branches → Branch protection rules
 * 勾選：
   - Require status checks to pass before merging
@@ -148,15 +131,15 @@ docker push ghcr.io/<OWNER>/<REPO>:local-test
 * 不確定要查多久 / 影響範圍大 → 先 revert 讓 main 先活過來，再慢慢查
 
 ## 部署
-可以先使用 Cloud Run(providing auto-scaling HTTP services)
+可以先使用 Cloud Run(providing auto-scaling HTTP services)  
 ![建立服務](/image/cloud_run/create_service.jpg)
 
 這裡選擇 Cloud Build，以下是官方對 Cloud Build的說明
 
-> 只要使用 Cloud Build 的持續部署功能，您就能將原始碼存放區的異動內容自動更新至 Artifact Registry 中的容器映像檔，並部署至 Cloud Run。
+> 只要使用 Cloud Build 的持續部署功能，您就能將原始碼存放區的異動內容自動更新至 Artifact Registry 中的容器映像檔，並部署至 Cloud Run。  
   您的程式碼應透過 $PORT 監聽 HTTP 要求，存放區中則須包含 Dockerfile 或 Go、Node.js、Python、Java、.NET Core 或 Ruby 的原始碼，以便建構到容器映像檔中。
 
-這是官方對於 Cloud Build 的說明，簡單來說
+簡單來說就是
 * Cloud Build「負責部署」
 * Cloud Run「負責上線後服務」
 
@@ -289,31 +272,30 @@ gcloud run services update-traffic YOUR_SERVICE \
 ![發佈版本標籤](/image/deploy_via_release/trigger_tag.jpg)
 
 這樣一來當發布 `v.` 開頭的 tag 時就會部署  
-值得一提的是，使用這個部署方式，`ci-release.yml`(release types: [published])
+值得一提的是，使用這個部署方式，`ci-release.yml`(release types: [published])  
 跟 Cloud Build 會同時觸發。
 
 
 ## 手動部署
-先到Cloud Build / 觸發條件 把剛才的觸發條件先停用
-建立新的觸發條件選擇手動叫用
+先到Cloud Build / 觸發條件 把剛才的觸發條件先停用  
+建立新的觸發條件選擇手動叫用  
 ![手動叫用部署](/image/manul_deploy/manul_deploy_config.jpg)
 
-UI手動建立似乎沒有法加入tag選項，預設是抓 latest 版號
-(不過使用 CLI 應該可以指定 tag)
+UI手動建立似乎沒有法加入tag選項，預設是抓 latest 版號  
+(不過使用 CLI 應該可以指定 tag)  
 ![manul_deploy](/image/manul_deploy/manul_deploy_choose_branch.jpg)
 
 ## 自定義 pipeline
-* 這邊Cloud Build 設定欓選擇自定義的 cloudbuild.yaml，示範 Canary deployment + Smoke test
+* 這邊Cloud Build 設定欓選擇自定義的 cloudbuild.yaml，示範 Canary deployment + Smoke test. 
   👉 完整執行你定義的 pipeline
-* 手動部署似乎沒有預設的寫入內嵌 YAML，選用內嵌 YAML跑會失敗
+* 手動部署似乎沒有預設的寫入內嵌 YAML，選用內嵌 YAML跑會失敗  
 ![自定義pipeline](/image/cloudbuild_pipeline/cloudbuild_pipeline.jpg)
 
 新增了 cloudbuild.yaml 後就可以部署看看
 - - -
-為了讓 Cloud Build 可以讀取 GHCR.io 必須先設定 Artifact Registry
-![artifact registry](/image/manul_deploy/artifact_registry.jpg)
-上面大概是必須要填的欄位，其中驗證模式比較麻煩，
-密鑰需要新增，這裡填上面的 GHCR 時得到的 key
+為了讓 Cloud Build 可以讀取 GHCR.io 必須先設定 Artifact Registry  
+![artifact registry](/image/manul_deploy/artifact_registry.jpg)  
+上面大概是必須要填的欄位，其中驗證模式比較麻煩，密鑰需要新增，這裡填上面的 GHCR 時得到的 key
 ![GHCR key](/image/manul_deploy/ghcr_key.jpg)
 
 ### cloudbuild.yaml
@@ -322,12 +304,12 @@ UI手動建立似乎沒有法加入tag選項，預設是抓 latest 版號
   `Canary deployment + Smoke test`
 * 當中有幾個步驟是打印 _route:list_ 與清除快取 _route:clear_，是中途debug用，不是必要的，不過就留著供日後參考用
 
-### 容易誤入的坑
+### 容易錯誤的的地方
 * cloudbuild.yaml中
-  `_IMAGE: "asia-east1-docker.pkg.dev/<Project>/<Registry>/pancioue/cicd-repo:latest"`
-  這種形式似乎不會正確去抓 latest 版本，起初的方向以為是 route cache，後來發現是 image 版本不對  
-  儘管有設定 Artifact Registry(可以到Artifact->Project->Registry確認是否有設連結了)，
-  必須使用GHCR的 digest，但要抓到 digest 也很麻煩，這份 cloudbuild.yaml是最後測試成功的版本
+  `_IMAGE: "asia-east1-docker.pkg.dev/<Project>/<Registry>/pancioue/cicd-repo:latest"`  
+  這種形式似乎不會正確去抓 latest 版本，起初的方向以為是 route cache，後來發現是 image 版本不對
+  儘管有設定 Artifact Registry(可以到Artifact->Project->Registry確認是否有設連結了)，  
+  必須使用GHCR的 digest，但要抓到 digest 也很麻煩。
 * 當遇到類似情況，可以先到 Cloud Run->service的修訂版本的檢查映像檔，是否是指定的版本
 * 讓 cloudbuild可以存取 Secret Manager 密鑰存取者(在上面步驟中有建立的)
   > Cloud Build -> 權限 -> 下方 Secret Manager 密鑰存取者 啟用
@@ -341,8 +323,7 @@ UI手動建立似乎沒有法加入tag選項，預設是抓 latest 版號
   ```
 * 不管怎麼試都打不通 `/healthz`，可能 cloud run有前面擋掉這路由
 
-打通這裡很辛苦，不太優雅，
-如果要使用手動部署+自定義的 pipeline，可以試試直接上傳到 GCP的 Artifact Registry 可能會簡單點
+打通這裡很辛苦，不太優雅，如果要使用手動部署+自定義的 pipeline，可以試試直接上傳到 GCP的 Artifact Registry 可能會簡單點
 
 ### 名詞解釋
 * Canary deployment
@@ -356,15 +337,3 @@ Canary deployment 是一種部署策略，
   - 輕量
   - 驗證「服務有沒有起來、基本功能是否可用」
   - 通常是 /healthz, /up, /ping  
-
-## Pub/Sub 訊息 是什麼時候用的
-1️⃣ 非 Git 事件觸發部署
-2️⃣ 跨系統、自動化流程
-Pub/Sub 是 「當 Git 不夠用時」的進階解法
-
-## 2) 加一個最基本的 Test Job（CI 才完整）
-
-### 如果你想再快一點（進階）：用 BuildKit cache mount 讓 composer 下載快取留住（同一 runner/同一 cache 會更有感）。
-
-## 版本會爆炸怎麼辦?
-相對不重要，先記錄保留問題
